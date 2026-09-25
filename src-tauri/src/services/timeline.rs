@@ -127,7 +127,10 @@ fn digest(timeline: &SgpTimeline, players: &[GameParticipant]) -> GameDigest {
     for p in &timeline.participants {
         ids.insert(&p.puuid, p.participant_id);
     }
-    let lane_frame = timeline.frames.iter().find(|f| f.timestamp >= LANE_CHECK_MS);
+    let lane_frame = timeline
+        .frames
+        .iter()
+        .find(|f| f.timestamp >= LANE_CHECK_MS);
 
     let mut out = GameDigest::new();
     for player in players {
@@ -170,7 +173,8 @@ fn digest(timeline: &SgpTimeline, players: &[GameParticipant]) -> GameDigest {
 fn early_deaths_to(timeline: &SgpTimeline, victim: i64, killers: &[i64]) -> i64 {
     let mut count = 0;
     for event in timeline.frames.iter().flat_map(|f| &f.events) {
-        if event.kind != "CHAMPION_KILL" || event.victim_id != victim || event.timestamp > EARLY_MS {
+        let early_death = event.victim_id == victim && event.timestamp <= EARLY_MS;
+        if event.kind != "CHAMPION_KILL" || !early_death {
             continue;
         }
         let assists = &event.assisting_participant_ids;
