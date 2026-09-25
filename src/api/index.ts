@@ -34,6 +34,8 @@ export interface LcuSnapshot {
   summoner: Summoner | null;
   gameflowPhase: GameflowPhase;
   lastError: string | null;
+  /** A client is running but only an elevated Lumina can read its credentials. */
+  needsAdmin: boolean;
 }
 
 export interface PhaseChange {
@@ -44,6 +46,7 @@ export interface PhaseChange {
 export const api = {
   appInfo: () => invoke<AppInfo>("app_info"),
   lcuSnapshot: () => invoke<LcuSnapshot>("lcu_snapshot"),
+  relaunchAsAdmin: () => invoke<void>("relaunch_as_admin"),
 };
 
 export const events = {

@@ -38,6 +38,8 @@ pub struct LcuSnapshot {
     pub summoner: Option<Summoner>,
     pub gameflow_phase: String,
     pub last_error: Option<String>,
+    /// A client is running but only an elevated Lumina can read its credentials.
+    pub needs_admin: bool,
 }
 
 impl Default for LcuSnapshot {
@@ -48,6 +50,7 @@ impl Default for LcuSnapshot {
             summoner: None,
             gameflow_phase: gameflow::PHASE_NONE.to_owned(),
             last_error: None,
+            needs_admin: false,
         }
     }
 }
@@ -91,6 +94,16 @@ impl AppState {
         self.update_lcu(|s| {
             *s = LcuSnapshot {
                 last_error,
+                ..LcuSnapshot::default()
+            };
+        });
+    }
+
+    pub fn mark_needs_admin(&self, hint: &str) {
+        self.update_lcu(|s| {
+            *s = LcuSnapshot {
+                last_error: Some(hint.to_owned()),
+                needs_admin: true,
                 ..LcuSnapshot::default()
             };
         });

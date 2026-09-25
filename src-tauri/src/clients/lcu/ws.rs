@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use futures_util::{SinkExt, StreamExt};
 use serde_json::Value;
 use tokio::net::TcpStream;
@@ -12,12 +14,14 @@ use tokio_tungstenite::{
 use super::discovery::Credentials;
 use super::http::{basic_auth, tls_connector};
 use super::models::LcuEvent;
-use crate::error::Result;
+use crate::error::{AppError, Result};
 
 /// WAMP SUBSCRIBE to every LCU JSON API event.
 const SUBSCRIBE_ALL: &str = r#"[5,"OnJsonApiEvent"]"#;
 /// WAMP EVENT message type id.
 const WAMP_EVENT: u64 = 8;
+/// League Akari uses 17.5s; the socket is local, so anything slower means a stuck client.
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 
 pub struct LcuSocket {
     stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
@@ -33,8 +37,11 @@ impl LcuSocket {
         request.headers_mut().insert(AUTHORIZATION, auth);
 
         let connector = Connector::NativeTls(tls_connector()?);
-        let (mut stream, _) =
-            connect_async_tls_with_config(request, None, false, Some(connector)).await?;
+        let connect = connect_async_tls_with_config(request, None, false, Some(connector));
+        let Ok(result) = tokio::time::timeout(CONNECT_TIMEOUT, connect).await else {
+            return Err(AppError::Timeout("LCU WebSocket 连接"));
+        };
+        let (mut stream, _) = result?;
         stream.send(Message::Text(SUBSCRIBE_ALL.into())).await?;
         Ok(Self { stream })
     }

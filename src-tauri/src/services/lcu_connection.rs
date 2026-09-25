@@ -18,7 +18,7 @@ const SCAN_INTERVAL: Duration = Duration::from_secs(2);
 /// How long to wait for a freshly started client to answer API calls.
 const READY_ATTEMPTS: u32 = 30;
 const UNREADABLE_HINT: &str =
-    "检测到英雄联盟客户端，但无法读取连接信息。请尝试以管理员身份运行 Lumina。";
+    "检测到英雄联盟客户端，但无法读取连接信息，需要以管理员身份运行 Lumina。";
 
 const CURRENT_SUMMONER: &str = "/lol-summoner/v1/current-summoner";
 const GAMEFLOW_PHASE: &str = "/lol-gameflow/v1/gameflow-phase";
@@ -42,7 +42,7 @@ async fn supervise(app: AppHandle) {
                     state.reset_lcu(None);
                 }
             }
-            Ok(Discovery::Unreadable) => state.reset_lcu(Some(UNREADABLE_HINT.to_owned())),
+            Ok(Discovery::Unreadable) => state.mark_needs_admin(UNREADABLE_HINT),
             Ok(Discovery::NotRunning) => state.reset_lcu(None),
             Err(err) => log::error!("process scan failed: {err}"),
         }

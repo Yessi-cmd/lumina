@@ -21,7 +21,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
-            commands::lcu_snapshot
+            commands::lcu_snapshot,
+            commands::relaunch_as_admin
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

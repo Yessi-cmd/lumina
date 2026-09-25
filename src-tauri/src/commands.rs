@@ -1,6 +1,8 @@
 use serde::Serialize;
-use tauri::State;
+use tauri::{AppHandle, State};
 
+use crate::error::Result;
+use crate::services;
 use crate::state::{AppState, LcuSnapshot};
 
 #[derive(Serialize)]
@@ -21,4 +23,9 @@ pub fn app_info() -> AppInfo {
 #[tauri::command]
 pub fn lcu_snapshot(state: State<'_, AppState>) -> LcuSnapshot {
     state.lcu_snapshot()
+}
+
+#[tauri::command]
+pub async fn relaunch_as_admin(app: AppHandle) -> Result<()> {
+    services::elevation::relaunch_as_admin(app).await
 }

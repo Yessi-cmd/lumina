@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import type { ConnectionStatus } from "../api";
+import { computed, ref } from "vue";
+import { api, type ConnectionStatus } from "../api";
 import { phaseLabel, useLcuStore } from "../stores/lcu";
 
 const lcu = useLcuStore();
@@ -19,6 +19,16 @@ const riotId = computed(() => {
   if (summoner.gameName) return `${summoner.gameName}#${summoner.tagLine}`;
   return summoner.displayName || "-";
 });
+
+const relaunchError = ref<string | null>(null);
+async function relaunchAsAdmin() {
+  relaunchError.value = null;
+  try {
+    await api.relaunchAsAdmin();
+  } catch (err) {
+    relaunchError.value = String(err);
+  }
+}
 
 const sourceLabel = computed(() =>
   s.value.client?.source === "lockfile" ? "lockfile" : "进程命令行",
@@ -46,6 +56,14 @@ const sourceLabel = computed(() =>
         启动英雄联盟客户端后会自动连接。
       </p>
       <p v-if="s.lastError" class="mt-3 text-sm break-all text-red-400">{{ s.lastError }}</p>
+      <button
+        v-if="s.needsAdmin"
+        class="mt-3 rounded-md bg-amber-500 px-3 py-1.5 text-sm font-medium text-zinc-950 hover:bg-amber-400"
+        @click="relaunchAsAdmin"
+      >
+        以管理员身份重启
+      </button>
+      <p v-if="relaunchError" class="mt-2 text-sm text-red-400">{{ relaunchError }}</p>
     </div>
 
     <div class="grid grid-cols-2 gap-4">

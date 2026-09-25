@@ -15,6 +15,15 @@ pub enum AppError {
 
     #[error("WebSocket 错误: {0}")]
     WebSocket(Box<tokio_tungstenite::tungstenite::Error>),
+
+    #[error("{0}超时")]
+    Timeout(&'static str),
+
+    #[error("I/O 错误: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("{0}")]
+    Message(String),
 }
 
 impl From<tokio_tungstenite::tungstenite::Error> for AppError {

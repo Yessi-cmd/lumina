@@ -8,6 +8,7 @@ const initial: LcuSnapshot = {
   summoner: null,
   gameflowPhase: "None",
   lastError: null,
+  needsAdmin: false,
 };
 
 export const useLcuStore = defineStore("lcu", () => {
