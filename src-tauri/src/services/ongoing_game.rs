@@ -135,7 +135,9 @@ fn describe(roster: &Roster) -> String {
     let (allies, enemies) = (roster.allies.len(), roster.enemies.len());
     let hidden = roster.hidden_enemies;
     let stage = roster.stage;
-    format!("{stage:?} game {id} queue {queue}: {allies} allies, {enemies} enemies, {hidden} hidden")
+    format!(
+        "{stage:?} game {id} queue {queue}: {allies} allies, {enemies} enemies, {hidden} hidden"
+    )
 }
 
 /// Warms the match-history cache so each player card fills as soon as it asks.
