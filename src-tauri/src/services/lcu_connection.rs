@@ -15,7 +15,7 @@ use crate::clients::lcu::ws::LcuSocket;
 use crate::clients::sgp::http::SgpClient;
 use crate::clients::sgp::servers;
 use crate::error::Result;
-use crate::services::{auto_accept, ongoing_game};
+use crate::services::{auto_accept, ongoing_game, panel_window};
 use crate::state::gameflow::PHASE_NONE;
 use crate::state::session::LcuSession;
 use crate::state::{AppState, ClientInfo, ConnectionStatus};
@@ -159,6 +159,7 @@ fn event_router(app: AppHandle) -> UriRouter {
             let phase = phase.unwrap_or(PHASE_NONE).to_owned();
             ongoing_game::on_phase(&phase_app, &phase);
             auto_accept::on_phase(&phase_app, &phase);
+            panel_window::on_phase(&phase_app, &phase);
             phase_app.state::<AppState>().set_gameflow_phase(phase);
         })
         .on(ongoing_game::CHAMP_SELECT_SESSION, move |event| {

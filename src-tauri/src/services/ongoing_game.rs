@@ -118,12 +118,24 @@ fn set_champ_select_queue(app: &AppHandle, queue_id: i64) {
 }
 
 fn apply(app: &AppHandle, roster: Option<Roster>) {
+    let summary = roster.as_ref().map(describe);
     let fresh = app.state::<AppState>().set_roster(roster);
     if fresh.is_empty() {
         return;
     }
+    if let Some(summary) = summary {
+        log::info!("roster {summary}, {} new players", fresh.len());
+    }
     let app = app.clone();
     tauri::async_runtime::spawn(prefetch(app, fresh));
+}
+
+fn describe(roster: &Roster) -> String {
+    let (id, queue) = (roster.game_id, roster.queue_id);
+    let (allies, enemies) = (roster.allies.len(), roster.enemies.len());
+    let hidden = roster.hidden_enemies;
+    let stage = roster.stage;
+    format!("{stage:?} game {id} queue {queue}: {allies} allies, {enemies} enemies, {hidden} hidden")
 }
 
 /// Warms the match-history cache so each player card fills as soon as it asks.

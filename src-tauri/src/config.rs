@@ -16,6 +16,8 @@ pub struct Settings {
     pub auto_accept: bool,
     /// Seconds to wait before accepting, leaving time to decline by hand.
     pub auto_accept_delay_secs: u32,
+    /// Bring the window forward when champ select starts and when the game loads.
+    pub auto_show_panel: bool,
 }
 
 impl Default for Settings {
@@ -23,6 +25,7 @@ impl Default for Settings {
         Self {
             auto_accept: false,
             auto_accept_delay_secs: 2,
+            auto_show_panel: true,
         }
     }
 }
@@ -79,6 +82,7 @@ mod tests {
         let s: Settings = serde_json::from_str(json).unwrap();
         let s = s.normalized();
         assert!(!s.auto_accept);
+        assert!(s.auto_show_panel);
         assert_eq!(s.auto_accept_delay_secs, MAX_ACCEPT_DELAY_SECS);
     }
 }

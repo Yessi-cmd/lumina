@@ -62,6 +62,21 @@ function onDelayInput(event: Event) {
         <span class="w-12 text-right text-sm tabular-nums">{{ s.autoAcceptDelaySecs }} 秒</span>
       </div>
 
+      <label class="mt-4 flex cursor-pointer items-center justify-between gap-4 border-t border-zinc-800 pt-4">
+        <div>
+          <div class="font-medium">自动弹出对局面板</div>
+          <div class="text-sm text-zinc-400">
+            进入英雄选择和加载界面时，把 Lumina 窗口切到前台并显示对局页。游戏若为独占全屏，弹出可能会让游戏最小化。
+          </div>
+        </div>
+        <input
+          type="checkbox"
+          class="size-5 accent-amber-500"
+          :checked="s.autoShowPanel"
+          @change="store.update({ autoShowPanel: ($event.target as HTMLInputElement).checked })"
+        />
+      </label>
+
       <p v-if="store.saveError" class="mt-3 text-sm text-red-400">{{ store.saveError }}</p>
     </div>
 

@@ -5,6 +5,7 @@ pub mod lcu_connection;
 pub mod match_history;
 pub mod matchup;
 pub mod ongoing_game;
+pub mod panel_window;
 pub mod player_profile;
 pub mod roster_insights;
 pub mod roster_relations;

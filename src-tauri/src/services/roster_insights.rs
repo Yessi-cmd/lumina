@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use serde::Serialize;
 
-use super::match_history::{GameResult, GameSummary, MatchHistoryPage};
+use super::match_history::{DataSource, GameResult, GameSummary, MatchHistoryPage};
 use super::matchup::{self, Advice, LaneMatchup, PlayerPower};
 use super::ongoing_game::PANEL_HISTORY_COUNT;
 use super::player_profile::{self, PlayerProfile, PlayerTag, ProfileContext};
@@ -58,6 +58,16 @@ pub async fn load(state: &AppState) -> Result<RosterInsights> {
     let profiles = profiles(&roster, &pages);
     let early = early_stats(state, &session, &roster, &pages).await;
     let matchup = matchup::analyze(&roster, &profiles, &early);
+
+    let from_sgp = pages.iter().filter(|p| p.source == DataSource::Sgp);
+    let sgp_pages = from_sgp.count();
+    log::info!(
+        "insights: {} histories ({sgp_pages} from SGP), {} rated, {} lanes, {} advice",
+        pages.len(),
+        matchup.powers.len(),
+        matchup.lanes.len(),
+        matchup.advice.len()
+    );
 
     let mut tags = relations.tags;
     for (puuid, extra) in matchup.tags {
@@ -120,13 +130,22 @@ async fn early_stats(
         (game.game_id, digest)
     });
     let mut digests: HashMap<i64, Arc<GameDigest>> = HashMap::new();
+    let mut failures = Vec::new();
     for (game_id, result) in futures_util::future::join_all(requests).await {
         match result {
             Ok(digest) => {
                 digests.insert(game_id, digest);
             }
-            Err(err) => log::debug!("timeline {game_id} unavailable: {err}"),
+            Err(err) => failures.push(format!("{game_id}: {err}")),
         }
+    }
+    let loaded = digests.len();
+    match failures.first() {
+        Some(first) => {
+            let failed = failures.len();
+            log::warn!("timelines: {loaded} loaded, {failed} unavailable, first: {first}");
+        }
+        None => log::info!("timelines: {loaded} loaded"),
     }
 
     let mut out = HashMap::new();

@@ -204,6 +204,8 @@ export interface Settings {
   autoAccept: boolean;
   /** 0–10 seconds before accepting, leaving time to decline by hand. */
   autoAcceptDelaySecs: number;
+  /** Bring the window forward when champ select starts and when the game loads. */
+  autoShowPanel: boolean;
 }
 
 export interface PendingAccept {
