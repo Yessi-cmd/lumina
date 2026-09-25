@@ -150,6 +150,7 @@ fn event_router(app: AppHandle) -> UriRouter {
     let champ_select_app = app.clone();
     let gameflow_app = app.clone();
     let ready_check_app = app.clone();
+    let lobby_app = app.clone();
     UriRouter::default()
         .on(GAMEFLOW_PHASE, move |event| {
             let phase = match event.event_type {
@@ -170,6 +171,9 @@ fn event_router(app: AppHandle) -> UriRouter {
         })
         .on(auto_accept::READY_CHECK, move |event| {
             auto_accept::on_ready_check(&ready_check_app, event);
+        })
+        .on(ongoing_game::LOBBY, move |event| {
+            ongoing_game::on_lobby(&lobby_app, event);
         })
         .on(CURRENT_SUMMONER, move |event| {
             if event.event_type == LcuEventType::Delete {

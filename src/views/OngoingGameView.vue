@@ -15,7 +15,8 @@ const insights = computed(() => ongoing.insights);
 const title = computed(() => {
   const r = roster.value;
   if (!r) return "对局";
-  const stage = r.stage === "champSelect" ? "英雄选择" : "对局中";
+  const STAGES = { lobby: "房间", champSelect: "英雄选择", inGame: "对局中" } as const;
+  const stage = STAGES[r.stage];
   return r.queueId > 0 ? `${stage} · ${gd.queueName(r.queueId, "")}` : stage;
 });
 
@@ -41,7 +42,7 @@ function championOf(puuid: string): number {
 
     <p v-if="!lcu.connected" class="text-sm text-zinc-400">连接英雄联盟客户端后显示对局信息。</p>
     <p v-else-if="!roster" class="text-sm text-zinc-400">
-      进入英雄选择后会自动显示队友近期战绩，进入加载界面后显示敌方。
+      进入房间后显示房间成员，英雄选择时显示队友，进入加载界面后显示敌方。
     </p>
 
     <template v-else>
@@ -67,7 +68,9 @@ function championOf(puuid: string): number {
 
       <div class="grid grid-cols-2 gap-6">
         <div class="flex flex-col gap-2">
-          <h2 class="text-sm font-medium text-sky-300">我方</h2>
+          <h2 class="text-sm font-medium text-sky-300">
+            {{ roster.stage === "lobby" ? "房间成员" : "我方" }}
+          </h2>
           <PlayerCard
             v-for="p in roster.allies"
             :key="p.puuid"
@@ -88,6 +91,12 @@ function championOf(puuid: string): number {
             :relation-tags="insights?.tags[p.puuid]"
             :power="insights?.powers[p.puuid]"
           />
+          <div
+            v-if="roster.stage === 'lobby'"
+            class="rounded-lg border border-dashed border-zinc-800 p-4 text-center text-sm text-zinc-500"
+          >
+            开始排队并进入英雄选择后显示队友，进入加载界面后显示敌方。
+          </div>
           <div
             v-if="roster.hiddenEnemies > 0"
             class="rounded-lg border border-dashed border-zinc-800 p-4 text-center text-sm text-zinc-500"

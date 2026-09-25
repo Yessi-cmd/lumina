@@ -3,7 +3,7 @@ use std::time::Duration;
 use reqwest::RequestBuilder;
 use serde::de::DeserializeOwned;
 
-use super::models::{SgpGameDetails, SgpMatchHistory};
+use super::models::{SgpGame, SgpGameDetails, SgpMatchHistory};
 use super::servers::ResolvedServer;
 use crate::error::{AppError, Result};
 
@@ -43,6 +43,15 @@ impl SgpClient {
             .get(url)
             .bearer_auth(entitlements_token)
             .query(&[("startIndex", start), ("count", count)]);
+        Self::send(request).await
+    }
+
+    /// Full summary of one game on this server, with every participant.
+    pub async fn game_summary(&self, entitlements_token: &str, game_id: i64) -> Result<SgpGame> {
+        let base = &self.server.server.match_history;
+        let game = format!("{}_{game_id}", self.server.path_region);
+        let url = format!("{base}/match-history-query/v1/products/lol/{game}/SUMMARY");
+        let request = self.client.get(url).bearer_auth(entitlements_token);
         Self::send(request).await
     }
 

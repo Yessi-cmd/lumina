@@ -109,7 +109,7 @@ export interface GameData {
   queueNames: Record<string, string>;
 }
 
-export type RosterStage = "champSelect" | "inGame";
+export type RosterStage = "lobby" | "champSelect" | "inGame";
 
 export interface RosterPlayer {
   puuid: string;
@@ -129,6 +129,36 @@ export interface Roster {
   enemies: RosterPlayer[];
   /** Opponents the client does not identify; during champ select that is all of them. */
   hiddenEnemies: number;
+}
+
+export interface PlayerLine {
+  puuid: string;
+  gameName: string;
+  tagLine: string;
+  championId: number;
+  champLevel: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  spells: [number, number];
+  items: number[];
+  cs: number;
+  gold: number;
+  damageToChampions: number;
+  damageTaken: number;
+  visionScore: number;
+  position: string;
+}
+
+export interface GameDetail {
+  gameId: number;
+  queueId: number;
+  gameMode: string;
+  createdAt: number;
+  duration: number;
+  source: DataSource;
+  /** Blue side (100) first. */
+  teams: { teamId: number; win: boolean; kills: number; gold: number; players: PlayerLine[] }[];
 }
 
 export type TagTone = "positive" | "negative" | "warning" | "neutral";
@@ -225,6 +255,7 @@ export const api = {
   matchHistory: (puuid: string, start: number, count: number) =>
     invoke<MatchHistoryPage>("match_history", { puuid, start, count }),
   gameData: () => invoke<GameData>("game_data"),
+  gameDetail: (gameId: number) => invoke<GameDetail>("game_detail", { gameId }),
   ongoingRoster: () => invoke<Roster | null>("ongoing_roster"),
   playerProfile: (puuid: string, championId: number, queueId: number, position: string) =>
     invoke<PlayerProfile>("player_profile", { puuid, championId, queueId, position }),

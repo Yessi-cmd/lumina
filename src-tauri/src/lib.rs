@@ -40,7 +40,8 @@ pub fn run() {
             commands::cancel_auto_accept,
             commands::log_dir,
             commands::open_log_dir,
-            commands::log_frontend
+            commands::log_frontend,
+            commands::game_detail
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

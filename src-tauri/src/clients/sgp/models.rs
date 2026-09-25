@@ -34,6 +34,8 @@ pub struct SgpGameJson {
 #[serde(default, rename_all = "camelCase")]
 pub struct SgpParticipant {
     pub puuid: String,
+    pub riot_id_game_name: String,
+    pub riot_id_tagline: String,
     pub team_id: i64,
     pub champion_id: i64,
     pub champ_level: i64,

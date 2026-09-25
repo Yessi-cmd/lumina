@@ -13,6 +13,8 @@ pub const ROSTER_EVENT: &str = "ongoing://roster";
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum RosterStage {
+    /// In a party before queueing: only the party members are known.
+    Lobby,
     ChampSelect,
     InGame,
 }

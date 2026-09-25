@@ -110,6 +110,7 @@ pub struct LcuParticipantStats {
     pub neutral_minions_killed: i64,
     pub gold_earned: i64,
     pub total_damage_dealt_to_champions: i64,
+    pub total_damage_taken: i64,
     pub vision_score: i64,
 }
 
@@ -121,9 +122,11 @@ pub struct LcuParticipantIdentity {
 }
 
 #[derive(Debug, Default, Deserialize)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct LcuPlayer {
     pub puuid: String,
+    pub game_name: String,
+    pub tag_line: String,
 }
 
 /// `/lol-game-data/assets/v1/champion-summary.json`
@@ -203,4 +206,26 @@ pub struct GameflowPlayer {
     pub puuid: String,
     pub champion_id: i64,
     pub selected_position: String,
+}
+
+/// `/lol-lobby/v2/lobby`
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct LobbySession {
+    pub game_config: LobbyGameConfig,
+    pub members: Vec<LobbyMember>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct LobbyGameConfig {
+    pub queue_id: i64,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct LobbyMember {
+    pub puuid: String,
+    /// `TOP`/`JUNGLE`/...; `UNSELECTED` or `FILL` when none.
+    pub first_position_preference: String,
 }

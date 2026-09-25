@@ -1,6 +1,7 @@
 pub mod auto_accept;
 pub mod elevation;
 pub mod game_data;
+pub mod game_detail;
 pub mod lcu_connection;
 pub mod match_history;
 pub mod matchup;

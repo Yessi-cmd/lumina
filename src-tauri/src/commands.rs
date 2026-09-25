@@ -8,6 +8,7 @@ use crate::logging;
 use crate::services;
 use crate::services::auto_accept::Pending;
 use crate::services::game_data::GameData;
+use crate::services::game_detail::GameDetail;
 use crate::services::match_history::MatchHistoryPage;
 use crate::services::player_profile::{PlayerProfile, ProfileContext};
 use crate::services::roster_insights::RosterInsights;
@@ -145,4 +146,11 @@ pub fn open_log_dir(app: AppHandle) -> Result<()> {
 #[tauri::command]
 pub fn log_frontend(level: String, message: String) {
     logging::frontend(&level, &message);
+}
+
+/// Every player of one finished game, for the expandable match history rows.
+#[tauri::command]
+pub async fn game_detail(state: State<'_, AppState>, game_id: i64) -> Result<GameDetail> {
+    let session = state.session()?;
+    state.game_details.get(&session, game_id).await
 }

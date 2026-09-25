@@ -151,7 +151,12 @@ watch(
     <p v-if="error" class="text-sm break-all text-red-400">{{ error }}</p>
 
     <div class="flex flex-col gap-1.5">
-      <MatchRow v-for="game in games" :key="game.gameId" :game="game" />
+      <MatchRow
+        v-for="game in games"
+        :key="game.gameId"
+        :game="game"
+        :puuid="summoner?.puuid ?? ''"
+      />
     </div>
 
     <p v-if="summoner && !loading && games.length === 0 && !error" class="text-sm text-zinc-400">

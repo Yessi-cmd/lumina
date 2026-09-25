@@ -1,10 +1,16 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import type { GameResult, GameSummary } from "../../api";
 import { useGameDataStore } from "../../stores/gameData";
 import { formatDuration, kdaRatio, timeAgo } from "../../utils/format";
+import GameDetailPanel from "./GameDetailPanel.vue";
 
-const props = defineProps<{ game: GameSummary }>();
+const props = defineProps<{
+  game: GameSummary;
+  /** Whose history this row belongs to. */
+  puuid: string;
+}>();
+const expanded = ref(false);
 const gd = useGameDataStore();
 
 const RESULT: Record<GameResult, { label: string; bar: string; text: string }> = {
@@ -22,7 +28,12 @@ const csPerMin = computed(() =>
 </script>
 
 <template>
-  <div class="flex items-center gap-3 overflow-hidden rounded-md bg-zinc-900 pr-3">
+  <div class="overflow-hidden rounded-md bg-zinc-900">
+  <div
+    class="flex cursor-pointer items-center gap-3 pr-3 hover:bg-zinc-800/60"
+    :title="expanded ? '收起对局详情' : '展开对局详情'"
+    @click="expanded = !expanded"
+  >
     <div class="w-1 self-stretch" :class="result.bar" />
 
     <div class="w-24 shrink-0 py-2 text-xs">
@@ -70,5 +81,7 @@ const csPerMin = computed(() =>
         <div v-else class="size-7 rounded bg-zinc-800" />
       </template>
     </div>
+    </div>
+    <GameDetailPanel v-if="expanded" :game-id="game.gameId" :puuid="puuid" />
   </div>
 </template>

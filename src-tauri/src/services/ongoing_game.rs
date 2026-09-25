@@ -1,24 +1,26 @@
-//! Who is in the current game. Teammates come from champ select; opponents are hidden
-//! there on the Chinese servers (and in ranked elsewhere), so they appear only once
-//! `/lol-gameflow/v1/session` lists both teams at GameStart.
+//! Who is in the current game. Party members come from the lobby, teammates from champ
+//! select; opponents are hidden there on the Chinese servers (and in ranked elsewhere),
+//! so they appear only once `/lol-gameflow/v1/session` lists both teams at GameStart.
 
 use tauri::{AppHandle, Manager};
 
 use crate::clients::lcu::models::{
     ChampSelectMember, ChampSelectSession, GameflowPlayer, GameflowSession, LcuEvent, LcuEventType,
+    LobbySession,
 };
 use crate::state::ongoing::{Roster, RosterPlayer, RosterStage};
 use crate::state::AppState;
 
 pub const CHAMP_SELECT_SESSION: &str = "/lol-champ-select/v1/session";
 pub const GAMEFLOW_SESSION: &str = "/lol-gameflow/v1/session";
+pub const LOBBY: &str = "/lol-lobby/v2/lobby";
 /// Same page the game panel requests, so prefetching fills its cache entry.
 pub const PANEL_HISTORY_COUNT: u32 = 20;
 const EMPTY_PUUID: &str = "00000000-0000-0000-0000-000000000000";
 /// Phases in which `/lol-gameflow/v1/session` carries the full player list.
 const IN_GAME_PHASES: [&str; 4] = ["GameStart", "InProgress", "Reconnect", "WaitingForStats"];
-/// Phases before any players are known; the previous game's roster is dropped.
-const IDLE_PHASES: [&str; 4] = ["None", "Lobby", "Matchmaking", "ReadyCheck"];
+/// Phases in which the party lobby is the best roster there is.
+const LOBBY_PHASES: [&str; 3] = ["Lobby", "Matchmaking", "ReadyCheck"];
 
 pub fn on_champ_select(app: &AppHandle, event: &LcuEvent) {
     if event.event_type == LcuEventType::Delete {
@@ -41,9 +43,45 @@ pub fn on_gameflow_session(app: &AppHandle, event: &LcuEvent) {
 }
 
 pub fn on_phase(app: &AppHandle, phase: &str) {
-    if IDLE_PHASES.contains(&phase) {
+    if phase == "None" {
         apply(app, None);
+    } else if LOBBY_PHASES.contains(&phase) {
+        tauri::async_runtime::spawn(load_lobby(app.clone()));
     }
+}
+
+pub fn on_lobby(app: &AppHandle, event: &LcuEvent) {
+    if event.event_type == LcuEventType::Delete {
+        let current = app.state::<AppState>().roster();
+        if current.is_some_and(|r| r.stage == RosterStage::Lobby) {
+            apply(app, None);
+        }
+        return;
+    }
+    match serde_json::from_value::<LobbySession>(event.data.clone()) {
+        Ok(lobby) => apply_lobby(app, lobby),
+        Err(err) => log::warn!("unexpected lobby payload: {err}"),
+    }
+}
+
+async fn load_lobby(app: AppHandle) {
+    let Ok(session) = app.state::<AppState>().session() else {
+        return;
+    };
+    match session.http.get::<LobbySession>(LOBBY).await {
+        Ok(lobby) => apply_lobby(&app, lobby),
+        Err(err) => log::debug!("no lobby: {err}"),
+    }
+}
+
+/// Lobby events also arrive during champ select and games; only use them before.
+fn apply_lobby(app: &AppHandle, lobby: LobbySession) {
+    let snapshot = app.state::<AppState>().lcu_snapshot();
+    if !LOBBY_PHASES.contains(&snapshot.gameflow_phase.as_str()) {
+        return;
+    }
+    let self_puuid = snapshot.summoner.map(|s| s.puuid).unwrap_or_default();
+    apply(app, Some(from_lobby(lobby, &self_puuid)));
 }
 
 /// Catches up when Lumina connects in the middle of champ select or a game.
@@ -52,6 +90,12 @@ pub async fn load_initial(app: &AppHandle, phase: &str) {
     let Ok(session) = state.session() else {
         return;
     };
+    if LOBBY_PHASES.contains(&phase) {
+        match session.http.get(LOBBY).await {
+            Ok(lobby) => apply_lobby(app, lobby),
+            Err(err) => log::debug!("no lobby: {err}"),
+        }
+    }
     if phase == "ChampSelect" {
         match session.http.get(CHAMP_SELECT_SESSION).await {
             Ok(cs) => apply_champ_select(app, cs),
@@ -72,6 +116,11 @@ fn apply_champ_select(app: &AppHandle, session: ChampSelectSession) {
     let mut roster = from_champ_select(session);
     let current = app.state::<AppState>().roster();
     let same_game = current.as_ref().filter(|c| c.game_id == roster.game_id);
+    // Queueing from a party already told us the queue.
+    let party = current.as_ref().filter(|c| c.stage == RosterStage::Lobby);
+    if let Some(lobby) = party {
+        roster.queue_id = lobby.queue_id;
+    }
     match same_game {
         Some(current) => roster.queue_id = current.queue_id,
         // First event of this champ select: ask the gameflow session for the queue.
@@ -154,6 +203,34 @@ async fn prefetch(app: AppHandle, puuids: Vec<String>) {
         if let Err(err) = result {
             log::debug!("match history prefetch failed: {err}");
         }
+    }
+}
+
+fn from_lobby(lobby: LobbySession, self_puuid: &str) -> Roster {
+    let mut allies = Vec::new();
+    for member in lobby.members {
+        if !is_known(&member.puuid) {
+            continue;
+        }
+        let preference = member.first_position_preference.to_uppercase();
+        let position = match preference.as_str() {
+            "TOP" | "JUNGLE" | "MIDDLE" | "BOTTOM" | "UTILITY" => preference,
+            _ => String::new(),
+        };
+        allies.push(RosterPlayer {
+            is_self: member.puuid == self_puuid,
+            puuid: member.puuid,
+            champion_id: 0,
+            position,
+        });
+    }
+    Roster {
+        stage: RosterStage::Lobby,
+        game_id: 0,
+        queue_id: lobby.game_config.queue_id,
+        allies,
+        enemies: Vec::new(),
+        hidden_enemies: 0,
     }
 }
 
