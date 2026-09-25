@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
 import { useAppStore } from "./stores/app";
+import { phaseLabel, useLcuStore } from "./stores/lcu";
 
 const app = useAppStore();
+const lcu = useLcuStore();
 
 const navItems = [
   { to: "/", label: "概览" },
@@ -13,6 +15,7 @@ const navItems = [
 
 onMounted(() => {
   app.load().catch((err) => console.error("Failed to load app info", err));
+  lcu.start().catch((err) => console.error("Failed to start LCU store", err));
 });
 </script>
 
@@ -31,7 +34,14 @@ onMounted(() => {
           {{ item.label }}
         </RouterLink>
       </nav>
-      <div class="mt-auto px-2 text-xs text-zinc-500">v{{ app.info?.version ?? "-" }}</div>
+      <div class="mt-auto flex items-center gap-2 px-2 text-xs text-zinc-400">
+        <span
+          class="size-2 rounded-full"
+          :class="lcu.connected ? 'bg-emerald-400' : 'bg-zinc-600'"
+        />
+        {{ lcu.connected ? phaseLabel(lcu.snapshot.gameflowPhase) : "未连接" }}
+      </div>
+      <div class="mt-2 px-2 text-xs text-zinc-500">v{{ app.info?.version ?? "-" }}</div>
     </aside>
     <main class="min-w-0 flex-1 overflow-auto p-6">
       <RouterView />

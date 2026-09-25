@@ -4,9 +4,9 @@
 
 | 层 | 选型 |
 |---|---|
-| 后端 | Tauri 2、tokio、reqwest (rustls)、tokio-tungstenite、serde、sysinfo |
+| 后端 | Tauri 2、tokio、reqwest + tokio-tungstenite（LCU 走 native-tls / SChannel）、serde、sysinfo |
 | 前端 | Vue 3、Vite、TypeScript、Pinia、vue-router、Tailwind CSS v4 |
-| 类型同步 | `tauri-specta`：由 Rust 类型生成 `src/api/bindings.ts`（M1 引入） |
+| 类型同步 | 目前在 `src/api/index.ts` 手写；接口变多后（M2）引入 `tauri-specta` 生成 `bindings.ts` |
 | 存储 | v0.1：内存 LRU + JSON 配置；v0.2：`rusqlite` |
 | 构建 | pnpm + cargo；GitHub Actions（Windows）出安装包 |
 
@@ -35,9 +35,12 @@
 ### 3.1 `clients/lcu`
 - **发现**：每 2s 扫描 `LeagueClientUx.exe`，解析命令行 `--app-port`、`--remoting-auth-token`、`--rso_platform_id`。
 - **降级**：腾讯服客户端以管理员运行时读不到命令行，改读安装目录 `lockfile`（`name:pid:port:password:protocol`），无需提权。
-- **HTTP**：reqwest + Basic Auth（`riot:<token>`），打包 `riotgames.pem` 校验证书，不关闭证书验证。
-- **WebSocket**：WAMP，发送 `[5, "OnJsonApiEvent"]` 订阅全部事件，按 URI 分发。
+- **HTTP**：reqwest + Basic Auth（`riot:<token>`），编译期嵌入 `riotgames.pem` 作为唯一信任根（关闭系统根证书）。
+  LCU 证书链到 Riot 2013 年的 v1/SHA-1 根证书，webpki（rustls）不接受，因此 LCU 用 native-tls（SChannel）；
+  叶子证书不是签给 `127.0.0.1` 的，所以只跳过主机名校验，证书链照常校验。
+- **WebSocket**：WAMP，发送 `[5, "OnJsonApiEvent"]` 订阅全部事件，`UriRouter` 按 URI 分发。
 - **重连**：客户端退出 → `Disconnected`，清状态，继续扫描。
+- **推送**：状态变化时 emit `lcu://snapshot`（完整快照）；阶段切换额外 emit `lcu://gameflow-phase`（`{ phase, previous }`）。
 
 ### 3.2 `clients/sgp`
 - token：LCU `/entitlements/v1/token`、`/lol-league-session/v1/league-session-token`。
@@ -74,11 +77,11 @@ lumina/
         ├── error.rs
         ├── config.rs
         ├── clients/
-        │   ├── lcu/            # discovery.rs http.rs ws.rs models.rs
+        │   ├── lcu/            # discovery.rs http.rs ws.rs events.rs models.rs
         │   ├── sgp/            # token.rs servers.rs http.rs models.rs
         │   └── live.rs
         ├── state/              # mod.rs gameflow.rs
-        ├── services/           # match_history.rs player_stats.rs auto_accept.rs ongoing_game.rs
+        ├── services/           # lcu_connection.rs match_history.rs player_stats.rs auto_accept.rs ongoing_game.rs
         ├── commands/
         └── asset_proxy.rs
 ```

@@ -20,6 +20,18 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+thiserror = "2"
+log = "0.4"
+tauri-plugin-log = "2"
+tokio = { version = "1", features = ["net", "time"] }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+base64 = "0.22"
+# LCU serves a certificate chained to Riot's 2013 v1/SHA-1 root, which webpki rejects,
+# so LCU traffic goes through SChannel via native-tls.
+native-tls = "0.2"
+reqwest = { version = "0.12", default-features = false, features = ["json", "native-tls"] }
+tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
+sysinfo = { version = "0.37", default-features = false, features = ["system"] }
 
 # https://v2.tauri.app/concept/size/#cargo-configuration
 [profile.release]
