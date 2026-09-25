@@ -51,7 +51,10 @@ pub async fn match_history(
     count: u32,
 ) -> Result<MatchHistoryPage> {
     let session = state.session()?;
-    state.match_history.get(&session, &puuid, start, count).await
+    state
+        .match_history
+        .get(&session, &puuid, start, count)
+        .await
 }
 
 #[tauri::command]

@@ -16,7 +16,9 @@ struct Alias<'a> {
 /// Looks up `名字#标签` on the current server.
 pub async fn by_riot_id(session: &LcuSession, riot_id: &str) -> Result<Summoner> {
     let Some((name, tag)) = parse_riot_id(riot_id) else {
-        return Err(AppError::Message("请输入完整的 Riot ID，例如 名字#12345".to_owned()));
+        return Err(AppError::Message(
+            "请输入完整的 Riot ID，例如 名字#12345".to_owned(),
+        ));
     };
     let alias = Alias {
         game_name: name,
