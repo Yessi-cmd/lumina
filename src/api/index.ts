@@ -89,6 +89,31 @@ export interface GameData {
   queueNames: Record<string, string>;
 }
 
+export type RosterStage = "champSelect" | "inGame";
+
+export interface RosterPlayer {
+  puuid: string;
+  /** Locked or hovered champion; 0 when none yet. */
+  championId: number;
+  /** TOP / JUNGLE / MIDDLE / BOTTOM / UTILITY; empty outside role queues. */
+  position: string;
+  isSelf: boolean;
+}
+
+export interface Roster {
+  stage: RosterStage;
+  gameId: number;
+  /** 0 when unknown (champ select does not say). */
+  queueId: number;
+  allies: RosterPlayer[];
+  enemies: RosterPlayer[];
+  /** Opponents the client does not identify; during champ select that is all of them. */
+  hiddenEnemies: number;
+}
+
+/** Page size the backend prefetches for every player in the current game. */
+export const PANEL_HISTORY_COUNT = 20;
+
 export const api = {
   appInfo: () => invoke<AppInfo>("app_info"),
   lcuSnapshot: () => invoke<LcuSnapshot>("lcu_snapshot"),
@@ -98,6 +123,7 @@ export const api = {
   matchHistory: (puuid: string, start: number, count: number) =>
     invoke<MatchHistoryPage>("match_history", { puuid, start, count }),
   gameData: () => invoke<GameData>("game_data"),
+  ongoingRoster: () => invoke<Roster | null>("ongoing_roster"),
 };
 
 /** LCU game-data images, proxied by the backend's `lcu-asset` protocol. */
@@ -108,6 +134,8 @@ export function assetUrl(lcuPath: string): string {
 export const events = {
   onLcuSnapshot: (cb: (s: LcuSnapshot) => void): Promise<UnlistenFn> =>
     listen<LcuSnapshot>("lcu://snapshot", (e) => cb(e.payload)),
+  onRoster: (cb: (r: Roster | null) => void): Promise<UnlistenFn> =>
+    listen<Roster | null>("ongoing://roster", (e) => cb(e.payload)),
   onGameflowPhase: (cb: (c: PhaseChange) => void): Promise<UnlistenFn> =>
     listen<PhaseChange>("lcu://gameflow-phase", (e) => cb(e.payload)),
 };

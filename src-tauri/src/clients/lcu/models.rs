@@ -149,3 +149,56 @@ pub struct LcuQueue {
     pub name: String,
     pub description: String,
 }
+
+/// `/lol-champ-select/v1/session`
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ChampSelectSession {
+    pub game_id: i64,
+    pub local_player_cell_id: i64,
+    pub my_team: Vec<ChampSelectMember>,
+    pub their_team: Vec<ChampSelectMember>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ChampSelectMember {
+    pub cell_id: i64,
+    pub puuid: String,
+    pub champion_id: i64,
+    pub champion_pick_intent: i64,
+    pub assigned_position: String,
+    /// `HIDDEN` for anonymized players (every opponent on the Chinese servers).
+    pub name_visibility_type: String,
+}
+
+/// `/lol-gameflow/v1/session`
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct GameflowSession {
+    pub phase: String,
+    pub game_data: GameflowGameData,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct GameflowGameData {
+    pub game_id: i64,
+    pub queue: GameflowQueue,
+    pub team_one: Vec<GameflowPlayer>,
+    pub team_two: Vec<GameflowPlayer>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct GameflowQueue {
+    pub id: i64,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct GameflowPlayer {
+    pub puuid: String,
+    pub champion_id: i64,
+    pub selected_position: String,
+}

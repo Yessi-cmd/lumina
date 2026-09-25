@@ -1,6 +1,7 @@
 //! Application state owned by the backend. The frontend only receives snapshots.
 
 pub mod gameflow;
+pub mod ongoing;
 pub mod session;
 
 use std::sync::{Arc, Mutex, PoisonError, RwLock};
@@ -12,6 +13,7 @@ use crate::clients::lcu::discovery::CredentialSource;
 use crate::clients::lcu::models::Summoner;
 use crate::error::{AppError, Result};
 use crate::services::match_history::MatchHistoryService;
+use ongoing::Roster;
 use session::LcuSession;
 
 pub const LCU_SNAPSHOT_EVENT: &str = "lcu://snapshot";
@@ -65,6 +67,7 @@ pub struct AppState {
     app: AppHandle,
     lcu: Mutex<LcuSnapshot>,
     session: RwLock<Option<Arc<LcuSession>>>,
+    roster: Mutex<Option<Roster>>,
     pub match_history: MatchHistoryService,
 }
 
@@ -74,6 +77,7 @@ impl AppState {
             app,
             lcu: Mutex::default(),
             session: RwLock::default(),
+            roster: Mutex::default(),
             match_history: MatchHistoryService::default(),
         }
     }
@@ -113,6 +117,7 @@ impl AppState {
     /// Back to `Disconnected`, keeping only an optional error for the UI.
     pub fn reset_lcu(&self, last_error: Option<String>) {
         self.set_session(None);
+        self.set_roster(None);
         self.update_lcu(|s| {
             *s = LcuSnapshot {
                 last_error,
@@ -123,6 +128,7 @@ impl AppState {
 
     pub fn mark_needs_admin(&self, hint: &str) {
         self.set_session(None);
+        self.set_roster(None);
         self.update_lcu(|s| {
             *s = LcuSnapshot {
                 last_error: Some(hint.to_owned()),

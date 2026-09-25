@@ -1,13 +1,27 @@
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { onMounted, watch } from "vue";
+import { useRouter } from "vue-router";
 import { useAppStore } from "./stores/app";
 import { useGameDataStore } from "./stores/gameData";
 import { phaseLabel, useLcuStore } from "./stores/lcu";
+import { useOngoingStore } from "./stores/ongoing";
 
 const app = useAppStore();
 const lcu = useLcuStore();
 // Created here so game data loads as soon as the client connects.
 useGameDataStore();
+const ongoing = useOngoingStore();
+const router = useRouter();
+
+// Jump to the game panel when champ select starts and again when the game loads.
+watch(
+  () => lcu.snapshot.gameflowPhase,
+  (phase, previous) => {
+    if (phase !== previous && (phase === "ChampSelect" || phase === "GameStart")) {
+      router.push("/ongoing-game");
+    }
+  },
+);
 
 const navItems = [
   { to: "/", label: "概览" },
@@ -19,6 +33,7 @@ const navItems = [
 onMounted(() => {
   app.load().catch((err) => console.error("Failed to load app info", err));
   lcu.start().catch((err) => console.error("Failed to start LCU store", err));
+  ongoing.start().catch((err) => console.error("Failed to start ongoing store", err));
 });
 </script>
 

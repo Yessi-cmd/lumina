@@ -28,7 +28,8 @@ pub fn run() {
             commands::lookup_summoner,
             commands::summoner_by_puuid,
             commands::match_history,
-            commands::game_data
+            commands::game_data,
+            commands::ongoing_roster
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

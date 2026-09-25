@@ -6,6 +6,7 @@ use crate::error::Result;
 use crate::services;
 use crate::services::game_data::GameData;
 use crate::services::match_history::MatchHistoryPage;
+use crate::state::ongoing::Roster;
 use crate::state::{AppState, LcuSnapshot};
 
 #[derive(Serialize)]
@@ -63,4 +64,10 @@ pub async fn match_history(
 pub async fn game_data(state: State<'_, AppState>) -> Result<GameData> {
     let session = state.session()?;
     services::game_data::get(&session).await
+}
+
+/// Current game's players; later changes arrive as `ongoing://roster` events.
+#[tauri::command]
+pub fn ongoing_roster(state: State<'_, AppState>) -> Option<Roster> {
+    state.roster()
 }

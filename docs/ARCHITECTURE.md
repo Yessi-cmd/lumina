@@ -59,9 +59,16 @@
 监听 `/lol-gameflow/v1/gameflow-phase`：
 `None → Lobby → Matchmaking → ReadyCheck → ChampSelect → InProgress → EndOfGame`
 
-- `ReadyCheck` → 自动接受
-- `ChampSelect` → 加载队友战绩
-- `InProgress` → 加载 10 人战绩
+- `ReadyCheck` → 自动接受（M3）
+- `ChampSelect` → 队友名单（`services/ongoing_game.rs`）
+- `GameStart` / `InProgress` → 10 人名单
+
+### 3.3.1 对局名单（M4）
+- 选人阶段：`/lol-champ-select/v1/session` 的 `myTeam`。敌方 `nameVisibilityType` 为 `HIDDEN`，
+  国服 `obfuscatedPuuid` 也为空，BP 阶段拿不到敌方身份（Akari 同样拿不到），不做反匿名。
+- 加载阶段：`/lol-gameflow/v1/session` 的 `gameData.teamOne/teamTwo` 出现双方 puuid，按自己所在队伍分我方/敌方。
+- 名单变化时 emit `ongoing://roster`，并对新出现的 puuid 预取第一页战绩（20 场）进缓存；
+  前端卡片请求同一页，基本直接命中缓存。进入 `None/Lobby/Matchmaking/ReadyCheck` 时清空名单。
 
 ### 3.4 性能
 - 战绩请求并发上限 5（`tokio::sync::Semaphore`）。

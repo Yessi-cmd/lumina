@@ -15,6 +15,7 @@ use crate::clients::lcu::ws::LcuSocket;
 use crate::clients::sgp::http::SgpClient;
 use crate::clients::sgp::servers;
 use crate::error::Result;
+use crate::services::ongoing_game;
 use crate::state::gameflow::PHASE_NONE;
 use crate::state::session::LcuSession;
 use crate::state::{AppState, ClientInfo, ConnectionStatus};
@@ -101,7 +102,9 @@ async fn run_session(app: &AppHandle, creds: &Credentials) -> Result<()> {
             client.sgp_server = sgp_server;
         }
     });
-    state.set_gameflow_phase(phase.unwrap_or_else(|_| PHASE_NONE.to_owned()));
+    let phase = phase.unwrap_or_else(|_| PHASE_NONE.to_owned());
+    state.set_gameflow_phase(phase.clone());
+    ongoing_game::load_initial(app, &phase).await;
     log::info!("connected to LCU on port {}", creds.port);
 
     let router = event_router(app.clone());
@@ -143,6 +146,8 @@ async fn wait_until_ready(state: &AppState, http: &LcuHttp) -> Result<Summoner> 
 
 fn event_router(app: AppHandle) -> UriRouter {
     let phase_app = app.clone();
+    let champ_select_app = app.clone();
+    let gameflow_app = app.clone();
     UriRouter::default()
         .on(GAMEFLOW_PHASE, move |event| {
             let phase = match event.event_type {
@@ -150,7 +155,14 @@ fn event_router(app: AppHandle) -> UriRouter {
                 _ => event.data.as_str(),
             };
             let phase = phase.unwrap_or(PHASE_NONE).to_owned();
+            ongoing_game::on_phase(&phase_app, &phase);
             phase_app.state::<AppState>().set_gameflow_phase(phase);
+        })
+        .on(ongoing_game::CHAMP_SELECT_SESSION, move |event| {
+            ongoing_game::on_champ_select(&champ_select_app, event);
+        })
+        .on(ongoing_game::GAMEFLOW_SESSION, move |event| {
+            ongoing_game::on_gameflow_session(&gameflow_app, event);
         })
         .on(CURRENT_SUMMONER, move |event| {
             if event.event_type == LcuEventType::Delete {

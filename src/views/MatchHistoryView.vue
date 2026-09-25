@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from "vue";
 import { useRoute } from "vue-router";
-import { api, type DataSource, type GameSummary, type Summoner } from "../api";
+import { api, PANEL_HISTORY_COUNT, type DataSource, type GameSummary, type Summoner } from "../api";
 import MatchRow from "../components/match/MatchRow.vue";
 import { profileIconUrl } from "../stores/gameData";
 import { useLcuStore } from "../stores/lcu";
 
-const PAGE_SIZE = 20;
+// Same size as the game panel, so opening a player from there hits the cache.
+const PAGE_SIZE = PANEL_HISTORY_COUNT;
 
 const lcu = useLcuStore();
 const route = useRoute();
