@@ -1,0 +1,30 @@
+[package]
+name = "lumina"
+version = "0.1.0"
+description = "A lightweight League of Legends companion built on the LCU and SGP APIs"
+authors = ["Yessi-cmd"]
+license = "MIT"
+repository = "https://github.com/Yessi-cmd/lumina"
+edition = "2021"
+rust-version = "1.85"
+
+[lib]
+# The `_lib` suffix avoids a bin/lib name clash on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "lumina_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# https://v2.tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
