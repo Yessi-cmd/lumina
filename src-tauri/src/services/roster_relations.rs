@@ -240,7 +240,11 @@ impl Met {
         } else {
             format!("{days} 天前")
         };
-        let relation = if self.last_teammate { "队友" } else { "对手" };
+        let relation = if self.last_teammate {
+            "队友"
+        } else {
+            "对手"
+        };
         let outcome = match self.last_result {
             Some(GameResult::Win) => "，你赢了",
             Some(GameResult::Loss) => "，你输了",

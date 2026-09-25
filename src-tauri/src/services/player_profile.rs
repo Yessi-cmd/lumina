@@ -184,7 +184,10 @@ pub fn build(page: &MatchHistoryPage, ctx: &ProfileContext) -> PlayerProfile {
     let counted: Vec<&GameSummary> = all.iter().copied().filter(|g| counts(g)).collect();
     let (scope, sample) = pick_sample(&counted, ctx.queue_id);
 
-    let wins = sample.iter().filter(|g| g.result == GameResult::Win).count();
+    let wins = sample
+        .iter()
+        .filter(|g| g.result == GameResult::Win)
+        .count();
     let win_rate = ratio(wins, sample.len());
     let avg_kda = avg_kda_of(&sample);
     let with_metrics = metric_games(&sample);
@@ -416,7 +419,9 @@ impl Facts<'_> {
         }
         if signal.preceding_entertainment > 0 {
             let count = signal.preceding_entertainment;
-            detail.push_str(&format!("更早的样本中有 {count} 场娱乐模式（仅作辅助信号）。"));
+            detail.push_str(&format!(
+                "更早的样本中有 {count} 场娱乐模式（仅作辅助信号）。"
+            ));
         }
         detail.push_str(BOOSTING_NOTE);
         Some(tag(
