@@ -2,8 +2,10 @@ use serde::Serialize;
 use tauri::{AppHandle, State};
 
 use crate::clients::lcu::models::Summoner;
+use crate::config::Settings;
 use crate::error::Result;
 use crate::services;
+use crate::services::auto_accept::Pending;
 use crate::services::game_data::GameData;
 use crate::services::match_history::MatchHistoryPage;
 use crate::services::player_profile::{PlayerProfile, ProfileContext};
@@ -96,4 +98,34 @@ pub async fn player_profile(
 #[tauri::command]
 pub async fn roster_insights(state: State<'_, AppState>) -> Result<RosterInsights> {
     services::roster_insights::load(&state).await
+}
+
+#[tauri::command]
+pub fn settings(state: State<'_, AppState>) -> Settings {
+    state.settings()
+}
+
+/// Turning auto accept off also cancels an accept that is already counting down.
+#[tauri::command]
+pub fn save_settings(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    settings: Settings,
+) -> Result<Settings> {
+    let saved = state.set_settings(settings)?;
+    if !saved.auto_accept {
+        services::auto_accept::cancel(&app);
+    }
+    Ok(saved)
+}
+
+/// Pending auto accept; later changes arrive as `auto-accept://state` events.
+#[tauri::command]
+pub fn auto_accept_state(state: State<'_, AppState>) -> Option<Pending> {
+    state.auto_accept.pending()
+}
+
+#[tauri::command]
+pub fn cancel_auto_accept(app: AppHandle) {
+    services::auto_accept::cancel(&app);
 }

@@ -1,3 +1,4 @@
+pub mod auto_accept;
 pub mod elevation;
 pub mod game_data;
 pub mod lcu_connection;

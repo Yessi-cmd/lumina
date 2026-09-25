@@ -74,6 +74,13 @@ impl LcuHttp {
         Ok(resp.json().await?)
     }
 
+    /// POST without a body, for actions that answer 204 No Content.
+    pub async fn post_empty(&self, path: &str) -> Result<()> {
+        let request = self.client.post(self.url(path));
+        Self::send(request, path).await?;
+        Ok(())
+    }
+
     /// Raw bytes and content type, for game assets such as icons.
     pub async fn get_bytes(&self, path: &str) -> Result<(Vec<u8>, Option<String>)> {
         let request = self.client.get(self.url(path));

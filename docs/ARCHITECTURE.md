@@ -59,7 +59,9 @@
 监听 `/lol-gameflow/v1/gameflow-phase`：
 `None → Lobby → Matchmaking → ReadyCheck → ChampSelect → InProgress → EndOfGame`
 
-- `ReadyCheck` → 自动接受（M3）
+- `ReadyCheck` → 自动接受（M3，`services/auto_accept.rs`）：按设置延迟 0–10 秒后 POST `/lol-matchmaking/v1/ready-check/accept`。
+  手动接受/拒绝（`/lol-matchmaking/v1/ready-check` 的 `playerResponse`）、点「取消本次」、关闭开关或离开 ReadyCheck 都会取消；
+  倒计时通过 `auto-accept://state` 推给前端横幅。设置保存在配置目录的 `settings.json`（`config.rs`）。
 - `ChampSelect` → 队友名单（`services/ongoing_game.rs`）
 - `GameStart` / `InProgress` → 10 人名单
 

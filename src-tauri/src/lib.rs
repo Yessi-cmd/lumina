@@ -1,6 +1,7 @@
 mod asset_proxy;
 mod clients;
 mod commands;
+mod config;
 mod error;
 mod services;
 mod state;
@@ -31,7 +32,11 @@ pub fn run() {
             commands::game_data,
             commands::ongoing_roster,
             commands::player_profile,
-            commands::roster_insights
+            commands::roster_insights,
+            commands::settings,
+            commands::save_settings,
+            commands::auto_accept_state,
+            commands::cancel_auto_accept
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

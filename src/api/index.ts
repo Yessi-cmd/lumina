@@ -200,6 +200,17 @@ export interface RosterInsights {
   advice: Advice[];
 }
 
+export interface Settings {
+  autoAccept: boolean;
+  /** 0–10 seconds before accepting, leaving time to decline by hand. */
+  autoAcceptDelaySecs: number;
+}
+
+export interface PendingAccept {
+  /** Unix milliseconds at which the match will be accepted. */
+  acceptAt: number;
+}
+
 /** Page size the backend prefetches for every player in the current game. */
 export const PANEL_HISTORY_COUNT = 20;
 
@@ -216,6 +227,10 @@ export const api = {
   playerProfile: (puuid: string, championId: number, queueId: number, position: string) =>
     invoke<PlayerProfile>("player_profile", { puuid, championId, queueId, position }),
   rosterInsights: () => invoke<RosterInsights>("roster_insights"),
+  settings: () => invoke<Settings>("settings"),
+  saveSettings: (settings: Settings) => invoke<Settings>("save_settings", { settings }),
+  autoAcceptState: () => invoke<PendingAccept | null>("auto_accept_state"),
+  cancelAutoAccept: () => invoke<void>("cancel_auto_accept"),
 };
 
 /** LCU game-data images, proxied by the backend's `lcu-asset` protocol. */
@@ -228,6 +243,8 @@ export const events = {
     listen<LcuSnapshot>("lcu://snapshot", (e) => cb(e.payload)),
   onRoster: (cb: (r: Roster | null) => void): Promise<UnlistenFn> =>
     listen<Roster | null>("ongoing://roster", (e) => cb(e.payload)),
+  onAutoAccept: (cb: (p: PendingAccept | null) => void): Promise<UnlistenFn> =>
+    listen<PendingAccept | null>("auto-accept://state", (e) => cb(e.payload)),
   onGameflowPhase: (cb: (c: PhaseChange) => void): Promise<UnlistenFn> =>
     listen<PhaseChange>("lcu://gameflow-phase", (e) => cb(e.payload)),
 };

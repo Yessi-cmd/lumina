@@ -11,7 +11,9 @@ use tauri::{AppHandle, Emitter};
 
 use crate::clients::lcu::discovery::CredentialSource;
 use crate::clients::lcu::models::Summoner;
+use crate::config::Settings;
 use crate::error::{AppError, Result};
+use crate::services::auto_accept::AutoAccept;
 use crate::services::match_history::MatchHistoryService;
 use crate::services::timeline::TimelineService;
 use ongoing::Roster;
@@ -69,20 +71,39 @@ pub struct AppState {
     lcu: Mutex<LcuSnapshot>,
     session: RwLock<Option<Arc<LcuSession>>>,
     roster: Mutex<Option<Roster>>,
+    settings: Mutex<Settings>,
     pub match_history: MatchHistoryService,
     pub timelines: TimelineService,
+    pub auto_accept: AutoAccept,
 }
 
 impl AppState {
     pub fn new(app: AppHandle) -> Self {
+        let settings = Settings::load(&app);
         Self {
             app,
             lcu: Mutex::default(),
             session: RwLock::default(),
             roster: Mutex::default(),
+            settings: Mutex::new(settings),
             match_history: MatchHistoryService::default(),
             timelines: TimelineService::default(),
+            auto_accept: AutoAccept::default(),
         }
+    }
+
+    pub fn settings(&self) -> Settings {
+        let guard = self.settings.lock().unwrap_or_else(PoisonError::into_inner);
+        guard.clone()
+    }
+
+    /// Validates, stores and persists new settings; returns what was stored.
+    pub fn set_settings(&self, settings: Settings) -> Result<Settings> {
+        let settings = settings.normalized();
+        settings.save(&self.app)?;
+        let mut guard = self.settings.lock().unwrap_or_else(PoisonError::into_inner);
+        guard.clone_from(&settings);
+        Ok(settings)
     }
 
     /// The live client connection, for commands that talk to LCU or SGP.
@@ -121,6 +142,7 @@ impl AppState {
     pub fn reset_lcu(&self, last_error: Option<String>) {
         self.set_session(None);
         self.set_roster(None);
+        self.auto_accept.clear();
         self.update_lcu(|s| {
             *s = LcuSnapshot {
                 last_error,
