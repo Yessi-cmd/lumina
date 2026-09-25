@@ -174,10 +174,30 @@ export interface PlayerProfile {
   tags: PlayerTag[];
 }
 
-export interface RosterRelations {
+export interface PlayerPower {
+  /** 0–100, 50 = average. */
+  power: number;
+  tier: "top" | "bottom" | null;
+  ally: boolean;
+  /** How the index was built. */
+  breakdown: string;
+}
+
+export interface Advice {
+  tone: TagTone;
+  /** Player the advice is about. */
+  puuid: string;
+  title: string;
+  detail: string;
+}
+
+export interface RosterInsights {
   premades: { name: string; members: string[]; allies: boolean; sharedGames: number }[];
-  /** Relation tags (premade, met before) per puuid. */
+  /** Roster-wide tags (premade, met, gank, lane, horses) per puuid. */
   tags: Record<string, PlayerTag[]>;
+  powers: Record<string, PlayerPower>;
+  lanes: { position: string; ally: string; enemy: string; allyPower: number; enemyPower: number }[];
+  advice: Advice[];
 }
 
 /** Page size the backend prefetches for every player in the current game. */
@@ -195,7 +215,7 @@ export const api = {
   ongoingRoster: () => invoke<Roster | null>("ongoing_roster"),
   playerProfile: (puuid: string, championId: number, queueId: number, position: string) =>
     invoke<PlayerProfile>("player_profile", { puuid, championId, queueId, position }),
-  rosterRelations: () => invoke<RosterRelations>("roster_relations"),
+  rosterInsights: () => invoke<RosterInsights>("roster_insights"),
 };
 
 /** LCU game-data images, proxied by the backend's `lcu-asset` protocol. */

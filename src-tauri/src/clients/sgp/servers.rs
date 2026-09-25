@@ -10,6 +10,7 @@ const SERVERS_JSON: &str = include_str!("../../../resources/servers.json");
 pub struct SgpServer {
     pub match_history: String,
     pub name: String,
+    pub region_path_param: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -25,6 +26,8 @@ static SERVERS: LazyLock<HashMap<String, SgpServer>> = LazyLock::new(|| {
 #[derive(Debug, Clone)]
 pub struct ResolvedServer {
     pub id: String,
+    /// Region segment of game ids in SGP paths, e.g. `HN1` in `HN1_11313055562`.
+    pub path_region: String,
     pub server: SgpServer,
 }
 
@@ -35,7 +38,16 @@ pub fn resolve(region: &str, platform_id: &str) -> Option<ResolvedServer> {
     let ids = [server_id(region, &platform), tencent];
     let id = ids.into_iter().find(|id| SERVERS.contains_key(id))?;
     let server = SERVERS[&id].clone();
-    Some(ResolvedServer { id, server })
+    let path_region = match &server.region_path_param {
+        Some(param) => param.clone(),
+        None if id.starts_with("TENCENT_") => platform,
+        None => id.clone(),
+    };
+    Some(ResolvedServer {
+        id,
+        path_region,
+        server,
+    })
 }
 
 /// Same normalization as League Akari's `getSgpServerId`.
@@ -66,6 +78,7 @@ mod tests {
     fn resolves_tencent_server() {
         let s = resolve("TENCENT", "hn1").unwrap();
         assert_eq!(s.id, "TENCENT_HN1");
+        assert_eq!(s.path_region, "HN1");
         assert_eq!(s.server.name, "艾欧尼亚");
     }
 
@@ -76,7 +89,7 @@ mod tests {
 
     #[test]
     fn normalizes_riot_regions() {
-        assert_eq!(resolve("EUW1", "EUW1").unwrap().id, "EUW");
+        assert_eq!(resolve("EUW1", "EUW1").unwrap().path_region, "EUW1");
         assert_eq!(resolve("NA", "NA1").unwrap().id, "NA1");
     }
 

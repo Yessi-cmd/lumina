@@ -20,6 +20,7 @@ const CACHE_TTL: Duration = Duration::from_secs(5 * 60);
 const CACHE_CAPACITY: usize = 256;
 const MAX_PAGE_SIZE: u32 = 50;
 const ENTITLEMENTS_TOKEN: &str = "/entitlements/v1/token";
+const SMITE: i64 = 11;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -104,6 +105,10 @@ pub struct GameMetrics {
 pub struct GameParticipant {
     pub puuid: String,
     pub team_id: i64,
+    /// `TOP`/`JUNGLE`/...; empty outside Summoner's Rift.
+    pub position: String,
+    /// Plays jungle (by position, or by carrying Smite).
+    pub jungler: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -211,14 +216,20 @@ async fn fetch(session: &LcuSession, req: &PageRequest) -> Result<MatchHistoryPa
     Ok(req.page(DataSource::Lcu, sgp_error, games))
 }
 
+/// Current entitlements access token, which SGP match history accepts.
+pub async fn entitlements_token(session: &LcuSession) -> Result<String> {
+    let token: EntitlementsToken = session.http.get(ENTITLEMENTS_TOKEN).await?;
+    Ok(token.access_token)
+}
+
 async fn fetch_sgp(
     session: &LcuSession,
     sgp: &SgpClient,
     req: &PageRequest,
 ) -> Result<Vec<GameSummary>> {
-    let token: EntitlementsToken = session.http.get(ENTITLEMENTS_TOKEN).await?;
+    let token = entitlements_token(session).await?;
     let history = sgp
-        .match_history(&token.access_token, &req.puuid, req.start, req.count)
+        .match_history(&token, &req.puuid, req.start, req.count)
         .await?;
 
     let mut games = Vec::new();
@@ -263,6 +274,8 @@ fn sgp_summary(game: SgpGameJson, puuid: &str) -> Option<GameSummary> {
         .map(|p| GameParticipant {
             puuid: p.puuid.clone(),
             team_id: p.team_id,
+            position: p.team_position.clone(),
+            jungler: p.team_position == "JUNGLE" || [p.spell1_id, p.spell2_id].contains(&SMITE),
         })
         .collect();
     Some(GameSummary {

@@ -7,7 +7,7 @@ use crate::services;
 use crate::services::game_data::GameData;
 use crate::services::match_history::MatchHistoryPage;
 use crate::services::player_profile::{PlayerProfile, ProfileContext};
-use crate::services::roster_relations::RosterRelations;
+use crate::services::roster_insights::RosterInsights;
 use crate::state::ongoing::Roster;
 use crate::state::{AppState, LcuSnapshot};
 
@@ -92,8 +92,8 @@ pub async fn player_profile(
     services::player_profile::load(&state.match_history, &session, &puuid, &ctx).await
 }
 
-/// Premade groups and "met before" tags for the current roster.
+/// Premades, "met before", early-game tags and the 上等马 / 下等马 comparison for the roster.
 #[tauri::command]
-pub async fn roster_relations(state: State<'_, AppState>) -> Result<RosterRelations> {
-    services::roster_relations::load(&state).await
+pub async fn roster_insights(state: State<'_, AppState>) -> Result<RosterInsights> {
+    services::roster_insights::load(&state).await
 }

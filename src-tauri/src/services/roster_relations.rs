@@ -7,11 +7,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 
 use super::match_history::{GameResult, GameSummary, MatchHistoryPage};
-use super::ongoing_game::PANEL_HISTORY_COUNT;
 use super::player_profile::{PlayerTag, Tone};
-use crate::error::Result;
 use crate::state::ongoing::Roster;
-use crate::state::AppState;
 
 /// Shared same-team games before two players count as premade. League Akari uses 5 over
 /// longer histories; 3 in 20 recent games is already unlikely to happen by chance.
@@ -35,28 +32,6 @@ pub struct PremadeGroup {
     pub allies: bool,
     /// Fewest shared games between two linked members.
     pub shared_games: usize,
-}
-
-/// Loads (mostly cached) histories of everyone in the roster and analyzes them.
-pub async fn load(state: &AppState) -> Result<RosterRelations> {
-    let Some(roster) = state.roster() else {
-        return Ok(RosterRelations::default());
-    };
-    let session = state.session()?;
-    let summoner = state.lcu_snapshot().summoner;
-    let self_puuid = summoner.map(|s| s.puuid).unwrap_or_default();
-
-    let mut puuids: Vec<String> = roster.puuids().map(str::to_owned).collect();
-    if !self_puuid.is_empty() && !puuids.contains(&self_puuid) {
-        puuids.push(self_puuid.clone());
-    }
-    let history = &state.match_history;
-    let requests = puuids
-        .iter()
-        .map(|puuid| history.get(&session, puuid, 0, PANEL_HISTORY_COUNT));
-    let results = futures_util::future::join_all(requests).await;
-    let pages: Vec<MatchHistoryPage> = results.into_iter().flatten().collect();
-    Ok(analyze(&roster, &self_puuid, &pages, now_ms()))
 }
 
 /// A game seen in someone's history; `owner` is whose page it came from.
@@ -308,7 +283,7 @@ fn self_result(seen: &Seen, self_puuid: &str, other: &str, teammate: bool) -> Op
     None
 }
 
-fn now_ms() -> i64 {
+pub fn now_ms() -> i64 {
     let since = SystemTime::now().duration_since(UNIX_EPOCH);
     let elapsed = since.unwrap_or_default();
     i64::try_from(elapsed.as_millis()).unwrap_or(i64::MAX)
@@ -375,6 +350,8 @@ mod tests {
             out.push(GameParticipant {
                 puuid: (*puuid).to_owned(),
                 team_id,
+                position: String::new(),
+                jungler: false,
             });
         }
         out

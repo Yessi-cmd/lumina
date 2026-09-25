@@ -31,7 +31,7 @@ pub fn run() {
             commands::game_data,
             commands::ongoing_roster,
             commands::player_profile,
-            commands::roster_relations
+            commands::roster_insights
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import {
   api,
   type GameResult,
+  type PlayerPower,
   type PlayerProfile,
   type PlayerTag,
   type RosterPlayer,
@@ -17,8 +18,9 @@ const props = defineProps<{
   player: RosterPlayer;
   /** 0 when unknown. */
   queueId: number;
-  /** Premade / met-before tags from the roster-wide analysis. */
+  /** Roster-wide tags (premade, met, gank, lane, horses). */
   relationTags?: PlayerTag[];
+  power?: PlayerPower;
 }>();
 const gd = useGameDataStore();
 const router = useRouter();
@@ -90,6 +92,13 @@ const tags = computed(() => {
 const shownTags = computed(() => tags.value.slice(0, MAX_TAGS));
 const hiddenTags = computed(() => tags.value.slice(MAX_TAGS));
 
+const powerClass = computed(() => {
+  const p = props.power?.power ?? 50;
+  if (p >= 60) return "border-emerald-500/60 text-emerald-300";
+  if (p <= 40) return "border-red-500/60 text-red-300";
+  return "border-zinc-600 text-zinc-300";
+});
+
 const winRateClass = computed(() => {
   const rate = profile.value?.winRate ?? 0;
   if (rate >= 0.6) return "text-emerald-400";
@@ -133,6 +142,14 @@ function openHistory() {
         <span class="truncate font-medium">{{ name }}</span>
         <span v-if="summoner" class="shrink-0 text-xs text-zinc-500">
           Lv.{{ summoner.summonerLevel }}
+        </span>
+        <span
+          v-if="power"
+          class="ml-auto shrink-0 rounded border px-1.5 text-xs tabular-nums"
+          :class="powerClass"
+          :title="power.breakdown"
+        >
+          战力 {{ Math.round(power.power) }}
         </span>
       </div>
 

@@ -1,11 +1,11 @@
 import { defineStore } from "pinia";
 import { shallowRef, watch } from "vue";
-import { api, events, type Roster, type RosterRelations } from "../api";
+import { api, events, type Roster, type RosterInsights } from "../api";
 
 /** Players of the current champ select or game, maintained by the backend. */
 export const useOngoingStore = defineStore("ongoing", () => {
   const roster = shallowRef<Roster | null>(null);
-  const relations = shallowRef<RosterRelations | null>(null);
+  const insights = shallowRef<RosterInsights | null>(null);
   let started = false;
 
   async function start() {
@@ -20,24 +20,27 @@ export const useOngoingStore = defineStore("ongoing", () => {
     if (!gotEvent) roster.value = current;
   }
 
-  // Premades and "met before" depend only on who is in the game, not on picks.
-  const playersKey = (r: Roster | null) =>
-    r ? [r.gameId, ...[...r.allies, ...r.enemies].map((p) => p.puuid).sort()].join(",") : "";
+  // Roster-wide analysis depends on who is in the game and the queue, not on picks.
+  const playersKey = (r: Roster | null) => {
+    if (!r) return "";
+    const puuids = [...r.allies, ...r.enemies].map((p) => p.puuid).sort();
+    return [r.gameId, r.queueId, ...puuids].join(",");
+  };
 
   watch(
     () => playersKey(roster.value),
     async (key) => {
-      relations.value = null;
+      insights.value = null;
       if (!key) return;
       try {
-        // Waits for every player's history; the backend has usually prefetched them.
-        const result = await api.rosterRelations();
-        if (key === playersKey(roster.value)) relations.value = result;
+        // Waits for every history (usually prefetched) and a few timelines per player.
+        const result = await api.rosterInsights();
+        if (key === playersKey(roster.value)) insights.value = result;
       } catch (err) {
-        console.warn("Failed to load roster relations", err);
+        console.warn("Failed to load roster insights", err);
       }
     },
   );
 
-  return { roster, relations, start };
+  return { roster, insights, start };
 });

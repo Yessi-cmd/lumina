@@ -1,6 +1,8 @@
 //! Subset of `match-history-query` SUMMARY payloads (match-v5 shaped).
 //! Every field defaults so schema drift degrades to zeros instead of failing a page.
 
+use std::collections::HashMap;
+
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -67,4 +69,54 @@ pub struct SgpParticipant {
 #[serde(default, rename_all = "camelCase")]
 pub struct SgpChallenges {
     pub solo_kills: f64,
+}
+
+/// `match-history-query` DETAILS: the match-v5 timeline, trimmed to what lane analysis needs.
+#[derive(Debug, Deserialize)]
+pub struct SgpGameDetails {
+    pub json: SgpTimeline,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct SgpTimeline {
+    pub frames: Vec<SgpFrame>,
+    pub participants: Vec<SgpTimelineParticipant>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SgpTimelineParticipant {
+    pub participant_id: i64,
+    pub puuid: String,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SgpFrame {
+    /// Milliseconds since game start.
+    pub timestamp: i64,
+    pub events: Vec<SgpEvent>,
+    /// Keyed by participant id as a string.
+    pub participant_frames: HashMap<String, SgpParticipantFrame>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SgpEvent {
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub timestamp: i64,
+    pub killer_id: i64,
+    pub victim_id: i64,
+    pub assisting_participant_ids: Vec<i64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SgpParticipantFrame {
+    pub total_gold: i64,
+    pub xp: i64,
+    pub minions_killed: i64,
+    pub jungle_minions_killed: i64,
 }

@@ -13,6 +13,7 @@ use crate::clients::lcu::discovery::CredentialSource;
 use crate::clients::lcu::models::Summoner;
 use crate::error::{AppError, Result};
 use crate::services::match_history::MatchHistoryService;
+use crate::services::timeline::TimelineService;
 use ongoing::Roster;
 use session::LcuSession;
 
@@ -69,6 +70,7 @@ pub struct AppState {
     session: RwLock<Option<Arc<LcuSession>>>,
     roster: Mutex<Option<Roster>>,
     pub match_history: MatchHistoryService,
+    pub timelines: TimelineService,
 }
 
 impl AppState {
@@ -79,6 +81,7 @@ impl AppState {
             session: RwLock::default(),
             roster: Mutex::default(),
             match_history: MatchHistoryService::default(),
+            timelines: TimelineService::default(),
         }
     }
 

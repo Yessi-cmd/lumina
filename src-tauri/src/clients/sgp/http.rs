@@ -1,6 +1,9 @@
 use std::time::Duration;
 
-use super::models::SgpMatchHistory;
+use reqwest::RequestBuilder;
+use serde::de::DeserializeOwned;
+
+use super::models::{SgpGameDetails, SgpMatchHistory};
 use super::servers::ResolvedServer;
 use crate::error::{AppError, Result};
 
@@ -35,13 +38,29 @@ impl SgpClient {
     ) -> Result<SgpMatchHistory> {
         let base = &self.server.server.match_history;
         let url = format!("{base}/match-history-query/v1/products/lol/player/{puuid}/SUMMARY");
-        let resp = self
+        let request = self
             .client
             .get(url)
             .bearer_auth(entitlements_token)
-            .query(&[("startIndex", start), ("count", count)])
-            .send()
-            .await?;
+            .query(&[("startIndex", start), ("count", count)]);
+        Self::send(request).await
+    }
+
+    /// Timeline of one game on this server.
+    pub async fn game_details(
+        &self,
+        entitlements_token: &str,
+        game_id: i64,
+    ) -> Result<SgpGameDetails> {
+        let base = &self.server.server.match_history;
+        let game = format!("{}_{game_id}", self.server.path_region);
+        let url = format!("{base}/match-history-query/v1/products/lol/{game}/DETAILS");
+        let request = self.client.get(url).bearer_auth(entitlements_token);
+        Self::send(request).await
+    }
+
+    async fn send<T: DeserializeOwned>(request: RequestBuilder) -> Result<T> {
+        let resp = request.send().await?;
         let status = resp.status();
         if !status.is_success() {
             return Err(AppError::SgpStatus(status.as_u16()));
