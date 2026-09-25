@@ -49,6 +49,8 @@ const sourceLabel = computed(() =>
         <dd>{{ s.client.platformId ?? "-" }}</dd>
         <dt class="text-zinc-500">进程</dt>
         <dd>PID {{ s.client.pid }} · 端口 {{ s.client.port }}</dd>
+        <dt class="text-zinc-500">战绩数据</dt>
+        <dd>{{ s.client.sgpServer ? `SGP · ${s.client.sgpServer}` : "仅 LCU" }}</dd>
         <dt class="text-zinc-500">凭据来源</dt>
         <dd>{{ sourceLabel }}</dd>
       </dl>

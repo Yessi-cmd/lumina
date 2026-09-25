@@ -6,7 +6,7 @@
 |---|---|
 | 后端 | Tauri 2、tokio、reqwest + tokio-tungstenite（LCU 走 native-tls / SChannel）、serde、sysinfo |
 | 前端 | Vue 3、Vite、TypeScript、Pinia、vue-router、Tailwind CSS v4 |
-| 类型同步 | 目前在 `src/api/index.ts` 手写；接口变多后（M2）引入 `tauri-specta` 生成 `bindings.ts` |
+| 类型同步 | 在 `src/api/index.ts` 手写。`tauri-specta` 需要在本机运行 debug 版才能生成 `bindings.ts`，维护者本机没有 Rust，暂不引入 |
 | 存储 | v0.1：内存 LRU + JSON 配置；v0.2：`rusqlite` |
 | 构建 | pnpm + cargo；GitHub Actions（Windows）出安装包 |
 
@@ -44,10 +44,16 @@
 - **推送**：状态变化时 emit `lcu://snapshot`（完整快照）；阶段切换额外 emit `lcu://gameflow-phase`（`{ phase, previous }`）。
 
 ### 3.2 `clients/sgp`
-- token：LCU `/entitlements/v1/token`、`/lol-league-session/v1/league-session-token`。
-- 服务器：内置 `resources/servers.json`，后续支持远程更新。
-- 接口：`match-history-query`（战绩）、`summoner-ledge`（玩家）、`gsm`（进行中的对局）。
-- 降级：SGP 不可用时回退到 LCU `/lol-match-history/...`，结果标注数据来源。
+- 服务器：内置 `resources/servers.json`（取自 League Akari 的内置配置，含国服各大区），后续支持远程更新。
+  由 LCU `/riotclient/region-locale` 的 region + platformId 解析（`TENCENT` + `HN1` → `TENCENT_HN1`）；
+  解析不到时仍可用，全部走 LCU。
+- token：战绩接口用 LCU `/entitlements/v1/token` 的 accessToken（每次请求前现取）；
+  `summoner-ledge` 等接口需要 `/lol-league-session/v1/league-session-token`，用到时再接入。
+- 接口：M2 只用 `match-history-query` 的 SUMMARY（按 puuid 分页）。
+  `gsm` 在国服选人阶段返回 403/404（见 Akari 日志），不用于 BP；加载阶段敌方名单直接取 LCU `/lol-gameflow/v1/session`。
+- 降级：SGP 失败时回退到 LCU `/lol-match-history/v1/products/lol/{puuid}/matches`，
+  结果带 `source` 与 `sgpError` 标注。
+- 注意：客户端开加速器时，Lumina 直连 SGP 不一定走加速，失败会自动回退 LCU。
 
 ### 3.3 `state/gameflow`
 监听 `/lol-gameflow/v1/gameflow-phase`：
@@ -60,7 +66,8 @@
 ### 3.4 性能
 - 战绩请求并发上限 5（`tokio::sync::Semaphore`）。
 - LRU 缓存 `(puuid, 分页)`，TTL 5 分钟。
-- 游戏图片走自定义协议 `lcu-asset://`，由 Rust 代理并落盘缓存。
+- 游戏图片走自定义协议 `lcu-asset://`（WebView 中为 `http://lcu-asset.localhost/<LCU 路径>`），
+  只放行 `/lol-game-data/assets/`，由 Rust 带认证取回并缓存到 app cache 目录。
 
 ## 4. 目录
 

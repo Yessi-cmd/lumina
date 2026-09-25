@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
 import { useAppStore } from "./stores/app";
+import { useGameDataStore } from "./stores/gameData";
 import { phaseLabel, useLcuStore } from "./stores/lcu";
 
 const app = useAppStore();
 const lcu = useLcuStore();
+// Created here so game data loads as soon as the client connects.
+useGameDataStore();
 
 const navItems = [
   { to: "/", label: "概览" },

@@ -19,9 +19,7 @@ struct ServersFile {
 
 static SERVERS: LazyLock<HashMap<String, SgpServer>> = LazyLock::new(|| {
     let file: Result<ServersFile, _> = serde_json::from_str(SERVERS_JSON);
-    file.expect("servers.json is val    let tencent = format!("TENCENT_{platform}");
-    let ids = [server_id(region, &platform), tencent];
-    let id = ids.into_iter().find(|id| SERVERS.contains_key(id))?;").servers
+    file.expect("servers.json is valid").servers
 });
 
 #[derive(Debug, Clone)]
