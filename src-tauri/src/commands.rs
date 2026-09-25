@@ -35,12 +35,14 @@ pub async fn relaunch_as_admin(app: AppHandle) -> Result<()> {
 
 #[tauri::command]
 pub async fn lookup_summoner(state: State<'_, AppState>, riot_id: String) -> Result<Summoner> {
-    services::summoner::by_riot_id(&state.session()?, &riot_id).await
+    let session = state.session()?;
+    services::summoner::by_riot_id(&session, &riot_id).await
 }
 
 #[tauri::command]
 pub async fn summoner_by_puuid(state: State<'_, AppState>, puuid: String) -> Result<Summoner> {
-    services::summoner::by_puuid(&state.session()?, &puuid).await
+    let session = state.session()?;
+    services::summoner::by_puuid(&session, &puuid).await
 }
 
 #[tauri::command]
@@ -59,5 +61,6 @@ pub async fn match_history(
 
 #[tauri::command]
 pub async fn game_data(state: State<'_, AppState>) -> Result<GameData> {
-    services::game_data::get(&state.session()?).await
+    let session = state.session()?;
+    services::game_data::get(&session).await
 }
