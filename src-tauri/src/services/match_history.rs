@@ -11,7 +11,7 @@ use tokio::sync::Semaphore;
 
 use crate::clients::lcu::models::{EntitlementsToken, LcuGame, LcuMatchHistory};
 use crate::clients::sgp::http::SgpClient;
-use crate::clients::sgp::models::SgpGameJson;
+use crate::clients::sgp::models::{SgpGameJson, SgpParticipant};
 use crate::error::Result;
 use crate::state::session::LcuSession;
 
@@ -73,6 +73,37 @@ pub struct GameSummary {
     pub damage_to_champions: i64,
     /// `TOP`/`JUNGLE`/...; empty when the source does not say.
     pub position: String,
+    pub team_id: i64,
+    pub vision_score: i64,
+    /// Team-relative figures. Only SGP lists every participant, so LCU pages have none.
+    pub metrics: Option<GameMetrics>,
+    /// Everyone in the game (SGP only), for premade and "met before" detection.
+    pub participants: Vec<GameParticipant>,
+}
+
+/// Shares are fractions of the player's team total (0.25 = 25%).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameMetrics {
+    pub team_size: usize,
+    pub damage_share: f64,
+    pub damage_taken_share: f64,
+    pub gold_share: f64,
+    pub cs_share: f64,
+    pub vision_share: f64,
+    pub kill_share: f64,
+    pub kill_participation: f64,
+    /// Own healing relative to the team's average damage taken (League Akari's definition).
+    pub heal_ratio: f64,
+    pub solo_kills: f64,
+    pub enemy_missing_pings: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameParticipant {
+    pub puuid: String,
+    pub team_id: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -213,18 +244,31 @@ async fn fetch_lcu(session: &LcuSession, req: &PageRequest) -> Result<Vec<GameSu
 }
 
 fn sgp_summary(game: SgpGameJson, puuid: &str) -> Option<GameSummary> {
-    let participants = game.participants;
-    let p = participants.into_iter().find(|p| p.puuid == puuid)?;
+    let all = &game.participants;
+    let p = all.iter().find(|p| p.puuid == puuid)?;
     let result = game_result(
         &game.end_of_game_result,
         p.win,
         p.game_ended_in_early_surrender,
         p.team_early_surrendered,
     );
+    // Arena groups players into subteams, which team shares do not describe.
+    let metrics = if game.game_mode == "CHERRY" {
+        None
+    } else {
+        Some(sgp_metrics(all, p))
+    };
+    let participants = all
+        .iter()
+        .map(|p| GameParticipant {
+            puuid: p.puuid.clone(),
+            team_id: p.team_id,
+        })
+        .collect();
     Some(GameSummary {
         game_id: game.game_id,
         queue_id: game.queue_id,
-        game_mode: game.game_mode,
+        game_mode: game.game_mode.clone(),
         created_at: game.game_creation,
         duration: game.game_duration,
         result,
@@ -240,8 +284,50 @@ fn sgp_summary(game: SgpGameJson, puuid: &str) -> Option<GameSummary> {
         cs: p.total_minions_killed + p.neutral_minions_killed,
         gold: p.gold_earned,
         damage_to_champions: p.total_damage_dealt_to_champions,
-        position: p.team_position,
+        position: p.team_position.clone(),
+        team_id: p.team_id,
+        vision_score: p.vision_score,
+        metrics,
+        participants,
     })
+}
+
+fn sgp_metrics(all: &[SgpParticipant], me: &SgpParticipant) -> GameMetrics {
+    let team: Vec<&SgpParticipant> = all.iter().filter(|p| p.team_id == me.team_id).collect();
+    let total = |f: fn(&SgpParticipant) -> i64| team_total(&team, f);
+    let cs = |p: &SgpParticipant| p.total_minions_killed + p.neutral_minions_killed;
+
+    let team_kills = total(|p| p.kills);
+    let team_taken = total(|p| p.total_damage_taken);
+    let avg_taken = team_taken as f64 / team.len().max(1) as f64;
+    GameMetrics {
+        team_size: team.len(),
+        damage_share: ratio(
+            me.total_damage_dealt_to_champions,
+            total(|p| p.total_damage_dealt_to_champions),
+        ),
+        damage_taken_share: ratio(me.total_damage_taken, team_taken),
+        gold_share: ratio(me.gold_earned, total(|p| p.gold_earned)),
+        cs_share: ratio(cs(me), total(cs)),
+        vision_share: ratio(me.vision_score, total(|p| p.vision_score)),
+        kill_share: ratio(me.kills, team_kills),
+        kill_participation: ratio(me.kills + me.assists, team_kills),
+        heal_ratio: me.total_heal as f64 / avg_taken.max(1.0),
+        solo_kills: me.challenges.solo_kills,
+        enemy_missing_pings: me.enemy_missing_pings,
+    }
+}
+
+fn team_total(team: &[&SgpParticipant], f: fn(&SgpParticipant) -> i64) -> i64 {
+    team.iter().copied().map(f).sum()
+}
+
+fn ratio(part: i64, total: i64) -> f64 {
+    if total <= 0 {
+        0.0
+    } else {
+        part as f64 / total as f64
+    }
 }
 
 /// LCU lists only the queried player's participant in each game.
@@ -287,6 +373,10 @@ fn lcu_summary(game: LcuGame, puuid: &str) -> Option<GameSummary> {
         gold: s.gold_earned,
         damage_to_champions: s.total_damage_dealt_to_champions,
         position: String::new(),
+        team_id: p.team_id,
+        vision_score: s.vision_score,
+        metrics: None,
+        participants: Vec::new(),
     })
 }
 

@@ -32,6 +32,7 @@ pub struct SgpGameJson {
 #[serde(default, rename_all = "camelCase")]
 pub struct SgpParticipant {
     pub puuid: String,
+    pub team_id: i64,
     pub champion_id: i64,
     pub champ_level: i64,
     pub kills: i64,
@@ -53,5 +54,17 @@ pub struct SgpParticipant {
     pub neutral_minions_killed: i64,
     pub gold_earned: i64,
     pub total_damage_dealt_to_champions: i64,
+    pub total_damage_taken: i64,
+    pub total_heal: i64,
+    pub vision_score: i64,
+    pub enemy_missing_pings: i64,
     pub team_position: String,
+    pub challenges: SgpChallenges,
+}
+
+/// match-v5 `challenges`; values may be fractional, so they are read as floats.
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SgpChallenges {
+    pub solo_kills: f64,
 }

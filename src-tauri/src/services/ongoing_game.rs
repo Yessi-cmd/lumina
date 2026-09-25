@@ -25,7 +25,7 @@ pub fn on_champ_select(app: &AppHandle, event: &LcuEvent) {
         return;
     }
     match serde_json::from_value::<ChampSelectSession>(event.data.clone()) {
-        Ok(session) => apply(app, Some(from_champ_select(session))),
+        Ok(session) => apply_champ_select(app, session),
         Err(err) => log::warn!("unexpected champ select payload: {err}"),
     }
 }
@@ -54,10 +54,12 @@ pub async fn load_initial(app: &AppHandle, phase: &str) {
     };
     if phase == "ChampSelect" {
         match session.http.get(CHAMP_SELECT_SESSION).await {
-            Ok(cs) => apply(app, Some(from_champ_select(cs))),
+            Ok(cs) => apply_champ_select(app, cs),
             Err(err) => log::warn!("failed to load champ select session: {err}"),
         }
-    } else if IN_GAME_PHASES.contains(&phase) {
+    }
+    // Also gives champ select its queue id.
+    if phase == "ChampSelect" || IN_GAME_PHASES.contains(&phase) {
         match session.http.get(GAMEFLOW_SESSION).await {
             Ok(gs) => apply_gameflow(app, gs),
             Err(err) => log::warn!("failed to load gameflow session: {err}"),
@@ -65,13 +67,52 @@ pub async fn load_initial(app: &AppHandle, phase: &str) {
     }
 }
 
+/// Champ select does not name the queue; keep the one the gameflow session reported.
+fn apply_champ_select(app: &AppHandle, session: ChampSelectSession) {
+    let mut roster = from_champ_select(session);
+    let current = app.state::<AppState>().roster();
+    let same_game = current.as_ref().filter(|c| c.game_id == roster.game_id);
+    match same_game {
+        Some(current) => roster.queue_id = current.queue_id,
+        // First event of this champ select: ask the gameflow session for the queue.
+        None => {
+            tauri::async_runtime::spawn(load_queue(app.clone()));
+        }
+    }
+    apply(app, Some(roster));
+}
+
+async fn load_queue(app: AppHandle) {
+    let Ok(session) = app.state::<AppState>().session() else {
+        return;
+    };
+    match session.http.get::<GameflowSession>(GAMEFLOW_SESSION).await {
+        Ok(gs) => apply_gameflow(&app, gs),
+        Err(err) => log::debug!("failed to load gameflow session: {err}"),
+    }
+}
+
 fn apply_gameflow(app: &AppHandle, session: GameflowSession) {
+    if session.phase == "ChampSelect" {
+        set_champ_select_queue(app, session.game_data.queue.id);
+        return;
+    }
     if !IN_GAME_PHASES.contains(&session.phase.as_str()) {
         return;
     }
     let snapshot = app.state::<AppState>().lcu_snapshot();
     let self_puuid = snapshot.summoner.map(|s| s.puuid).unwrap_or_default();
     if let Some(roster) = from_gameflow(session, &self_puuid) {
+        apply(app, Some(roster));
+    }
+}
+
+fn set_champ_select_queue(app: &AppHandle, queue_id: i64) {
+    let Some(mut roster) = app.state::<AppState>().roster() else {
+        return;
+    };
+    if roster.stage == RosterStage::ChampSelect && roster.queue_id != queue_id {
+        roster.queue_id = queue_id;
         apply(app, Some(roster));
     }
 }

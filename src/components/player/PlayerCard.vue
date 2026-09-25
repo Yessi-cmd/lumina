@@ -3,29 +3,42 @@ import { computed, shallowRef, watch } from "vue";
 import { useRouter } from "vue-router";
 import {
   api,
-  PANEL_HISTORY_COUNT,
   type GameResult,
-  type GameSummary,
+  type PlayerProfile,
+  type PlayerTag,
   type RosterPlayer,
+  type SampleScope,
   type Summoner,
 } from "../../api";
 import { useGameDataStore } from "../../stores/gameData";
-import { summarize } from "../../utils/stats";
+import TagChip from "./TagChip.vue";
 
-const props = defineProps<{ player: RosterPlayer }>();
+const props = defineProps<{
+  player: RosterPlayer;
+  /** 0 when unknown. */
+  queueId: number;
+  /** Premade / met-before tags from the roster-wide analysis. */
+  relationTags?: PlayerTag[];
+}>();
 const gd = useGameDataStore();
 const router = useRouter();
 
 const summoner = shallowRef<Summoner | null>(null);
-const games = shallowRef<GameSummary[] | null>(null);
+const profile = shallowRef<PlayerProfile | null>(null);
 const error = shallowRef<string | null>(null);
 
+const MAX_TAGS = 5;
 const POSITIONS: Record<string, string> = {
   TOP: "上单",
   JUNGLE: "打野",
   MIDDLE: "中单",
   BOTTOM: "下路",
   UTILITY: "辅助",
+};
+const SCOPES: Record<SampleScope, string> = {
+  ranked: "排位",
+  sameQueue: "同模式",
+  all: "全部",
 };
 const DOT: Record<GameResult, string> = {
   win: "bg-emerald-500",
@@ -34,39 +47,59 @@ const DOT: Record<GameResult, string> = {
   abort: "bg-zinc-600",
 };
 
-async function load(puuid: string) {
-  summoner.value = null;
-  games.value = null;
-  error.value = null;
-  api
-    .summonerByPuuid(puuid)
-    .then((s) => {
-      if (puuid === props.player.puuid) summoner.value = s;
-    })
-    .catch(() => {});
-  try {
-    // The backend prefetched this exact page when the player appeared, so it is usually cached.
-    const page = await api.matchHistory(puuid, 0, PANEL_HISTORY_COUNT);
-    if (puuid === props.player.puuid) games.value = page.games;
-  } catch (err) {
-    if (puuid === props.player.puuid) error.value = String(err);
-  }
-}
+watch(
+  () => props.player.puuid,
+  (puuid) => {
+    summoner.value = null;
+    profile.value = null;
+    api
+      .summonerByPuuid(puuid)
+      .then((s) => {
+        if (puuid === props.player.puuid) summoner.value = s;
+      })
+      .catch(() => {});
+  },
+  { immediate: true },
+);
 
-watch(() => props.player.puuid, load, { immediate: true });
+// Re-evaluated when the pick changes (practice / signature tags) or the queue becomes known.
+watch(
+  () => [props.player.puuid, props.player.championId, props.queueId, props.player.position] as const,
+  async ([puuid, championId, queueId, position]) => {
+    error.value = null;
+    try {
+      const p = await api.playerProfile(puuid, championId, queueId, position);
+      if (puuid === props.player.puuid) profile.value = p;
+    } catch (err) {
+      if (puuid === props.player.puuid) error.value = String(err);
+    }
+  },
+  { immediate: true },
+);
 
-const stats = computed(() => (games.value ? summarize(games.value) : null));
 const name = computed(() => {
   const s = summoner.value;
   if (!s) return "…";
   return s.gameName ? `${s.gameName}#${s.tagLine}` : s.displayName || "…";
 });
+
+const tags = computed(() => {
+  const all = [...(props.relationTags ?? []), ...(profile.value?.tags ?? [])];
+  return all.sort((a, b) => b.priority - a.priority);
+});
+const shownTags = computed(() => tags.value.slice(0, MAX_TAGS));
+const hiddenTags = computed(() => tags.value.slice(MAX_TAGS));
+
 const winRateClass = computed(() => {
-  const rate = stats.value?.winRate ?? 0;
+  const rate = profile.value?.winRate ?? 0;
   if (rate >= 0.6) return "text-emerald-400";
   if (rate < 0.45) return "text-red-400";
   return "text-zinc-200";
 });
+
+function percent(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
 
 function openHistory() {
   router.push({ path: "/match-history", query: { puuid: props.player.puuid } });
@@ -74,8 +107,8 @@ function openHistory() {
 </script>
 
 <template>
-  <button
-    class="flex w-full items-center gap-3 rounded-lg border bg-zinc-900 p-3 text-left hover:bg-zinc-800"
+  <div
+    class="flex w-full cursor-pointer items-start gap-3 rounded-lg border bg-zinc-900 p-3 hover:bg-zinc-800/80"
     :class="player.isSelf ? 'border-amber-500/60' : 'border-zinc-800'"
     @click="openHistory"
   >
@@ -103,24 +136,50 @@ function openHistory() {
         </span>
       </div>
 
-      <p v-if="error" class="truncate text-xs text-red-400" :title="error">{{ error }}</p>
-      <p v-else-if="!stats" class="text-xs text-zinc-500">加载战绩…</p>
-      <p v-else-if="stats.counted === 0" class="text-xs text-zinc-500">近期没有对局</p>
+      <div v-if="tags.length" class="mt-1 flex flex-wrap gap-1" @click.stop>
+        <TagChip v-for="tag in shownTags" :key="tag.id + tag.label" :tag="tag" />
+        <span
+          v-if="hiddenTags.length"
+          class="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] leading-none text-zinc-400"
+          :title="hiddenTags.map((t) => `${t.label}：${t.detail}`).join('\n')"
+        >
+          +{{ hiddenTags.length }}
+        </span>
+      </div>
+
+      <p v-if="error" class="mt-1 truncate text-xs text-red-400" :title="error">{{ error }}</p>
+      <p v-else-if="!profile" class="mt-1 text-xs text-zinc-500">加载战绩…</p>
+      <p v-else-if="profile.sampleGames === 0" class="mt-1 text-xs text-zinc-500">近期没有对局</p>
       <template v-else>
-        <div class="mt-0.5 flex items-center gap-3 text-xs">
-          <span :class="winRateClass">
-            胜率 {{ Math.round(stats.winRate * 100) }}%
-            <span class="text-zinc-500">({{ stats.wins }}/{{ stats.counted }})</span>
+        <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+          <span :class="winRateClass" :title="`样本：近期${SCOPES[profile.scope]}对局`">
+            胜率 {{ percent(profile.winRate) }}
+            <span class="text-zinc-500">
+              ({{ profile.wins }}/{{ profile.sampleGames }} {{ SCOPES[profile.scope] }})
+            </span>
           </span>
           <span class="text-zinc-400">
-            {{ stats.avgKills.toFixed(1) }} / {{ stats.avgDeaths.toFixed(1) }} /
-            {{ stats.avgAssists.toFixed(1) }}
+            {{ profile.avgKills.toFixed(1) }} / {{ profile.avgDeaths.toFixed(1) }} /
+            {{ profile.avgAssists.toFixed(1) }}
           </span>
+          <span
+            v-if="profile.akariScore"
+            class="text-zinc-400"
+            :title="`Akari Score，基于 ${profile.akariScore.games} 场完整数据`"
+          >
+            评分 {{ profile.akariScore.total.toFixed(1) }}
+          </span>
+        </div>
+        <div v-if="profile.team" class="mt-0.5 flex flex-wrap gap-x-3 text-xs text-zinc-500">
+          <span>伤害 {{ percent(profile.team.damageShare) }}</span>
+          <span>承伤 {{ percent(profile.team.damageTakenShare) }}</span>
+          <span>经济 {{ percent(profile.team.goldShare) }}</span>
+          <span>参团 {{ percent(profile.team.killParticipation) }}</span>
         </div>
         <div class="mt-1.5 flex items-center gap-3">
           <div class="flex gap-0.5">
             <span
-              v-for="(r, i) in stats.recent"
+              v-for="(r, i) in profile.recent"
               :key="i"
               class="size-2 rounded-full"
               :class="DOT[r]"
@@ -128,7 +187,7 @@ function openHistory() {
           </div>
           <div class="flex gap-1">
             <img
-              v-for="c in stats.topChampions"
+              v-for="c in profile.topChampions"
               :key="c.championId"
               :src="gd.championIcon(c.championId)"
               :title="`${gd.championName(c.championId)} ${c.wins}胜${c.games - c.wins}负`"
@@ -138,5 +197,5 @@ function openHistory() {
         </div>
       </template>
     </div>
-  </button>
+  </div>
 </template>

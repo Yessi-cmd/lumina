@@ -69,6 +69,26 @@ export interface GameSummary {
   gold: number;
   damageToChampions: number;
   position: string;
+  teamId: number;
+  visionScore: number;
+  /** Team-relative figures; only SGP lists every participant, so LCU pages have none. */
+  metrics: GameMetrics | null;
+  participants: { puuid: string; teamId: number }[];
+}
+
+/** Shares are fractions of the team total (0.25 = 25%). */
+export interface GameMetrics {
+  teamSize: number;
+  damageShare: number;
+  damageTakenShare: number;
+  goldShare: number;
+  csShare: number;
+  visionShare: number;
+  killShare: number;
+  killParticipation: number;
+  healRatio: number;
+  soloKills: number;
+  enemyMissingPings: number;
 }
 
 export interface MatchHistoryPage {
@@ -111,6 +131,55 @@ export interface Roster {
   hiddenEnemies: number;
 }
 
+export type TagTone = "positive" | "negative" | "warning" | "neutral";
+
+export interface PlayerTag {
+  id: string;
+  label: string;
+  tone: TagTone;
+  /** Evidence and sample size, shown on hover. */
+  detail: string;
+  lowConfidence: boolean;
+  /** Higher shows first. */
+  priority: number;
+}
+
+export type SampleScope = "ranked" | "sameQueue" | "all";
+
+export interface PlayerProfile {
+  puuid: string;
+  source: DataSource;
+  scope: SampleScope;
+  sampleGames: number;
+  wins: number;
+  winRate: number;
+  avgKills: number;
+  avgDeaths: number;
+  avgAssists: number;
+  avgKda: number;
+  team: {
+    games: number;
+    damageShare: number;
+    damageTakenShare: number;
+    goldShare: number;
+    killParticipation: number;
+    csPerMinute: number;
+    visionPerMinute: number;
+    damagePerGold: number;
+  } | null;
+  akariScore: { total: number; max: number; games: number; outstanding: boolean; extraordinary: boolean } | null;
+  recent: GameResult[];
+  topChampions: { championId: number; games: number; wins: number }[];
+  position: string;
+  tags: PlayerTag[];
+}
+
+export interface RosterRelations {
+  premades: { name: string; members: string[]; allies: boolean; sharedGames: number }[];
+  /** Relation tags (premade, met before) per puuid. */
+  tags: Record<string, PlayerTag[]>;
+}
+
 /** Page size the backend prefetches for every player in the current game. */
 export const PANEL_HISTORY_COUNT = 20;
 
@@ -124,6 +193,9 @@ export const api = {
     invoke<MatchHistoryPage>("match_history", { puuid, start, count }),
   gameData: () => invoke<GameData>("game_data"),
   ongoingRoster: () => invoke<Roster | null>("ongoing_roster"),
+  playerProfile: (puuid: string, championId: number, queueId: number, position: string) =>
+    invoke<PlayerProfile>("player_profile", { puuid, championId, queueId, position }),
+  rosterRelations: () => invoke<RosterRelations>("roster_relations"),
 };
 
 /** LCU game-data images, proxied by the backend's `lcu-asset` protocol. */

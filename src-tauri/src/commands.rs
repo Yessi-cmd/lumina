@@ -6,6 +6,8 @@ use crate::error::Result;
 use crate::services;
 use crate::services::game_data::GameData;
 use crate::services::match_history::MatchHistoryPage;
+use crate::services::player_profile::{PlayerProfile, ProfileContext};
+use crate::services::roster_relations::RosterRelations;
 use crate::state::ongoing::Roster;
 use crate::state::{AppState, LcuSnapshot};
 
@@ -70,4 +72,28 @@ pub async fn game_data(state: State<'_, AppState>) -> Result<GameData> {
 #[tauri::command]
 pub fn ongoing_roster(state: State<'_, AppState>) -> Option<Roster> {
     state.roster()
+}
+
+/// Win/loss, averages and tags for one player, judged in the context of the current game.
+#[tauri::command]
+pub async fn player_profile(
+    state: State<'_, AppState>,
+    puuid: String,
+    champion_id: i64,
+    queue_id: i64,
+    position: String,
+) -> Result<PlayerProfile> {
+    let session = state.session()?;
+    let ctx = ProfileContext {
+        champion_id,
+        queue_id,
+        position,
+    };
+    services::player_profile::load(&state.match_history, &session, &puuid, &ctx).await
+}
+
+/// Premade groups and "met before" tags for the current roster.
+#[tauri::command]
+pub async fn roster_relations(state: State<'_, AppState>) -> Result<RosterRelations> {
+    services::roster_relations::load(&state).await
 }

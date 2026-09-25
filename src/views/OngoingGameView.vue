@@ -30,12 +30,24 @@ const title = computed(() => {
     <div v-else class="grid grid-cols-2 gap-6">
       <div class="flex flex-col gap-2">
         <h2 class="text-sm font-medium text-sky-300">我方</h2>
-        <PlayerCard v-for="p in roster.allies" :key="p.puuid" :player="p" />
+        <PlayerCard
+          v-for="p in roster.allies"
+          :key="p.puuid"
+          :player="p"
+          :queue-id="roster.queueId"
+          :relation-tags="ongoing.relations?.tags[p.puuid]"
+        />
       </div>
 
       <div class="flex flex-col gap-2">
         <h2 class="text-sm font-medium text-red-300">敌方</h2>
-        <PlayerCard v-for="p in roster.enemies" :key="p.puuid" :player="p" />
+        <PlayerCard
+          v-for="p in roster.enemies"
+          :key="p.puuid"
+          :player="p"
+          :queue-id="roster.queueId"
+          :relation-tags="ongoing.relations?.tags[p.puuid]"
+        />
         <div
           v-if="roster.hiddenEnemies > 0"
           class="rounded-lg border border-dashed border-zinc-800 p-4 text-center text-sm text-zinc-500"
