@@ -1,9 +1,25 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted, ref } from "vue";
+import { api } from "../api";
 import { useSettingsStore } from "../stores/settings";
 
 const store = useSettingsStore();
 const s = computed(() => store.settings);
+
+const logDir = ref<string | null>(null);
+const logError = ref<string | null>(null);
+
+onMounted(() => {
+  api
+    .logDir()
+    .then((dir) => (logDir.value = dir))
+    .catch((err) => (logError.value = String(err)));
+});
+
+function openLogDir() {
+  logError.value = null;
+  api.openLogDir().catch((err) => (logError.value = String(err)));
+}
 
 function onDelayInput(event: Event) {
   const value = Number((event.target as HTMLInputElement).value);
@@ -47,6 +63,27 @@ function onDelayInput(event: Event) {
       </div>
 
       <p v-if="store.saveError" class="mt-3 text-sm text-red-400">{{ store.saveError }}</p>
+    </div>
+
+    <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+      <div class="flex items-center justify-between gap-4">
+        <div class="min-w-0">
+          <div class="font-medium">日志</div>
+          <div class="text-sm text-zinc-400">
+            运行记录自动写入日志文件（单个 5MB，保留最近 5 个）。遇到问题时把日志发给开发者。
+          </div>
+          <div v-if="logDir" class="mt-1 truncate font-mono text-xs text-zinc-500" :title="logDir">
+            {{ logDir }}
+          </div>
+        </div>
+        <button
+          class="shrink-0 rounded-md border border-zinc-700 px-3 py-1.5 text-sm hover:bg-zinc-800"
+          @click="openLogDir"
+        >
+          打开日志目录
+        </button>
+      </div>
+      <p v-if="logError" class="mt-2 text-sm text-red-400">{{ logError }}</p>
     </div>
   </section>
 </template>

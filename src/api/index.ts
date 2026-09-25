@@ -231,6 +231,10 @@ export const api = {
   saveSettings: (settings: Settings) => invoke<Settings>("save_settings", { settings }),
   autoAcceptState: () => invoke<PendingAccept | null>("auto_accept_state"),
   cancelAutoAccept: () => invoke<void>("cancel_auto_accept"),
+  logDir: () => invoke<string>("log_dir"),
+  openLogDir: () => invoke<void>("open_log_dir"),
+  logFrontend: (level: "info" | "warn" | "error", message: string) =>
+    invoke<void>("log_frontend", { level, message }),
 };
 
 /** LCU game-data images, proxied by the backend's `lcu-asset` protocol. */

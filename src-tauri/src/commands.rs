@@ -4,6 +4,7 @@ use tauri::{AppHandle, State};
 use crate::clients::lcu::models::Summoner;
 use crate::config::Settings;
 use crate::error::Result;
+use crate::logging;
 use crate::services;
 use crate::services::auto_accept::Pending;
 use crate::services::game_data::GameData;
@@ -128,4 +129,20 @@ pub fn auto_accept_state(state: State<'_, AppState>) -> Option<Pending> {
 #[tauri::command]
 pub fn cancel_auto_accept(app: AppHandle) {
     services::auto_accept::cancel(&app);
+}
+
+#[tauri::command]
+pub fn log_dir(app: AppHandle) -> Result<String> {
+    Ok(logging::dir(&app)?.display().to_string())
+}
+
+#[tauri::command]
+pub fn open_log_dir(app: AppHandle) -> Result<()> {
+    logging::open_dir(&app)
+}
+
+/// Writes a frontend message (uncaught error, console warning) into the log file.
+#[tauri::command]
+pub fn log_frontend(level: String, message: String) {
+    logging::frontend(&level, &message);
 }

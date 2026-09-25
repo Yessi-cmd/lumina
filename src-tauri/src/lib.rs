@@ -3,6 +3,7 @@ mod clients;
 mod commands;
 mod config;
 mod error;
+mod logging;
 mod services;
 mod state;
 
@@ -10,14 +11,14 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let log_plugin = tauri_plugin_log::Builder::new()
-        .level(log::LevelFilter::Info)
-        .build();
+    logging::record_panics();
 
     tauri::Builder::default()
-        .plugin(log_plugin)
+        .plugin(logging::plugin())
         .register_asynchronous_uri_scheme_protocol(asset_proxy::SCHEME, asset_proxy::handle)
         .setup(|app| {
+            let version = env!("CARGO_PKG_VERSION");
+            log::info!("Lumina {version} starting on {}", std::env::consts::OS);
             app.manage(state::AppState::new(app.handle().clone()));
             services::lcu_connection::spawn(app.handle().clone());
             Ok(())
@@ -36,7 +37,10 @@ pub fn run() {
             commands::settings,
             commands::save_settings,
             commands::auto_accept_state,
-            commands::cancel_auto_accept
+            commands::cancel_auto_accept,
+            commands::log_dir,
+            commands::open_log_dir,
+            commands::log_frontend
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
