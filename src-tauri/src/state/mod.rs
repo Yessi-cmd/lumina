@@ -1,14 +1,18 @@
 //! Application state owned by the backend. The frontend only receives snapshots.
 
 pub mod gameflow;
+pub mod session;
 
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError, RwLock};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
 use crate::clients::lcu::discovery::CredentialSource;
 use crate::clients::lcu::models::Summoner;
+use crate::error::{AppError, Result};
+use crate::services::match_history::MatchHistoryService;
+use session::LcuSession;
 
 pub const LCU_SNAPSHOT_EVENT: &str = "lcu://snapshot";
 
@@ -28,6 +32,8 @@ pub struct ClientInfo {
     pub port: u16,
     pub platform_id: Option<String>,
     pub source: CredentialSource,
+    /// Display name of the SGP server, e.g. 艾欧尼亚; `None` means LCU-only.
+    pub sgp_server: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -58,6 +64,8 @@ impl Default for LcuSnapshot {
 pub struct AppState {
     app: AppHandle,
     lcu: Mutex<LcuSnapshot>,
+    session: RwLock<Option<Arc<LcuSession>>>,
+    pub match_history: MatchHistoryService,
 }
 
 impl AppState {
@@ -65,7 +73,20 @@ impl AppState {
         Self {
             app,
             lcu: Mutex::default(),
+            session: RwLock::default(),
+            match_history: MatchHistoryService::default(),
         }
+    }
+
+    /// The live client connection, for commands that talk to LCU or SGP.
+    pub fn session(&self) -> Result<Arc<LcuSession>> {
+        let guard = self.session.read().unwrap_or_else(PoisonError::into_inner);
+        guard.clone().ok_or(AppError::NotConnected)
+    }
+
+    pub fn set_session(&self, session: Option<Arc<LcuSession>>) {
+        let mut guard = self.session.write().unwrap_or_else(PoisonError::into_inner);
+        *guard = session;
     }
 
     pub fn lcu_snapshot(&self) -> LcuSnapshot {
@@ -91,6 +112,7 @@ impl AppState {
 
     /// Back to `Disconnected`, keeping only an optional error for the UI.
     pub fn reset_lcu(&self, last_error: Option<String>) {
+        self.set_session(None);
         self.update_lcu(|s| {
             *s = LcuSnapshot {
                 last_error,
@@ -100,6 +122,7 @@ impl AppState {
     }
 
     pub fn mark_needs_admin(&self, hint: &str) {
+        self.set_session(None);
         self.update_lcu(|s| {
             *s = LcuSnapshot {
                 last_error: Some(hint.to_owned()),

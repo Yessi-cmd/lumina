@@ -1,0 +1,31 @@
+{
+  "source": "League Akari builtin SGP config, updated 2026-07-18",
+  "servers": {
+    "TENCENT_HN1": { "matchHistory": "https://hn1-k8s-sgp.lol.qq.com:21019", "common": "https://hn1-k8s-sgp.lol.qq.com:21019", "name": "艾欧尼亚" },
+    "TENCENT_HN10": { "matchHistory": "https://hn10-k8s-sgp.lol.qq.com:21019", "common": "https://hn10-k8s-sgp.lol.qq.com:21019", "name": "黑色玫瑰" },
+    "TENCENT_TJ100": { "matchHistory": "https://tj100-sgp.lol.qq.com:21019", "common": "https://tj100-sgp.lol.qq.com:21019", "name": "联盟四区" },
+    "TENCENT_TJ101": { "matchHistory": "https://tj101-sgp.lol.qq.com:21019", "common": "https://tj101-sgp.lol.qq.com:21019", "name": "联盟五区" },
+    "TENCENT_NJ100": { "matchHistory": "https://nj100-sgp.lol.qq.com:21019", "common": "https://nj100-sgp.lol.qq.com:21019", "name": "联盟一区" },
+    "TENCENT_GZ100": { "matchHistory": "https://gz100-sgp.lol.qq.com:21019", "common": "https://gz100-sgp.lol.qq.com:21019", "name": "联盟二区" },
+    "TENCENT_CQ100": { "matchHistory": "https://cq100-sgp.lol.qq.com:21019", "common": "https://cq100-sgp.lol.qq.com:21019", "name": "联盟三区" },
+    "TENCENT_BGP2": { "matchHistory": "https://bgp2-k8s-sgp.lol.qq.com:21019", "common": "https://bgp2-k8s-sgp.lol.qq.com:21019", "name": "峡谷之巅" },
+    "TENCENT_PBE": { "matchHistory": "https://pbe-sgp.lol.qq.com:21019", "common": "https://pbe-sgp.lol.qq.com:21019", "name": "PBE (腾讯)" },
+    "TENCENT_PREPBE": { "matchHistory": "https://prepbe-sgp.lol.qq.com:21019", "common": "https://prepbe-sgp.lol.qq.com:21019", "name": "PREPBE (腾讯)" },
+    "TW2": { "matchHistory": "https://apse1-red.pp.sgp.pvp.net", "common": "https://tw2-red.lol.sgp.pvp.net", "name": "台湾" },
+    "SG2": { "matchHistory": "https://apse1-red.pp.sgp.pvp.net", "common": "https://sg2-red.lol.sgp.pvp.net", "name": "新加坡" },
+    "PH2": { "matchHistory": "https://apse1-red.pp.sgp.pvp.net", "common": "https://ph2-red.lol.sgp.pvp.net", "name": "菲律宾" },
+    "VN2": { "matchHistory": "https://apse1-red.pp.sgp.pvp.net", "common": "https://vn2-red.lol.sgp.pvp.net", "name": "越南" },
+    "TH2": { "matchHistory": "https://apse1-red.pp.sgp.pvp.net", "common": "https://th2-red.lol.sgp.pvp.net", "name": "泰国" },
+    "PBE": { "matchHistory": "https://usw2-red.pp.sgp.pvp.net", "common": "https://pbe-red.lol.sgp.pvp.net", "name": "PBE", "regionPathParam": "PBE1" },
+    "EUW": { "matchHistory": "https://euc1-red.pp.sgp.pvp.net", "common": "https://euw-red.lol.sgp.pvp.net", "name": "EUW", "regionPathParam": "EUW1" },
+    "JP": { "matchHistory": "https://apne1-red.pp.sgp.pvp.net", "common": "https://jp-red.lol.sgp.pvp.net", "name": "日本", "regionPathParam": "JP1" },
+    "KR": { "matchHistory": "https://apne1-red.pp.sgp.pvp.net", "common": "https://kr-red.lol.sgp.pvp.net", "name": "韩国" },
+    "RU": { "matchHistory": "https://euc1-red.pp.sgp.pvp.net", "common": "https://ru-red.lol.sgp.pvp.net", "name": "俄罗斯" },
+    "TR1": { "matchHistory": "https://euc1-red.pp.sgp.pvp.net", "common": "https://tr-red.lol.sgp.pvp.net", "name": "土耳其" },
+    "BR1": { "matchHistory": "https://usw2-red.pp.sgp.pvp.net", "common": "https://br-red.lol.sgp.pvp.net", "name": "巴西" },
+    "OC1": { "matchHistory": "https://apse1-red.pp.sgp.pvp.net", "common": "https://oce-red.lol.sgp.pvp.net", "name": "大洋洲" },
+    "LA1": { "matchHistory": "https://usw2-red.pp.sgp.pvp.net", "common": "https://lan-red.lol.sgp.pvp.net", "name": "北拉美" },
+    "LA2": { "matchHistory": "https://usw2-red.pp.sgp.pvp.net", "common": "https://las-red.lol.sgp.pvp.net", "name": "南拉美" },
+    "NA1": { "matchHistory": "https://usw2-red.pp.sgp.pvp.net", "common": "https://na-red.lol.sgp.pvp.net", "name": "北美" }
+  }
+}

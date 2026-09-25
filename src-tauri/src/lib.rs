@@ -1,3 +1,4 @@
+mod asset_proxy;
 mod clients;
 mod commands;
 mod error;
@@ -14,6 +15,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(log_plugin)
+        .register_asynchronous_uri_scheme_protocol(asset_proxy::SCHEME, asset_proxy::handle)
         .setup(|app| {
             app.manage(state::AppState::new(app.handle().clone()));
             services::lcu_connection::spawn(app.handle().clone());
@@ -22,7 +24,11 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
             commands::lcu_snapshot,
-            commands::relaunch_as_admin
+            commands::relaunch_as_admin,
+            commands::lookup_summoner,
+            commands::summoner_by_puuid,
+            commands::match_history,
+            commands::game_data
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

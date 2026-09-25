@@ -1,17 +1,22 @@
 //! Keeps a connection to the League client alive: discover → connect → stream events,
 //! and start over whenever the client exits.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use tauri::{AppHandle, Manager};
+use tokio::sync::OnceCell;
 
 use crate::clients::lcu::discovery::{self, Credentials, Discovery};
 use crate::clients::lcu::events::UriRouter;
 use crate::clients::lcu::http::LcuHttp;
-use crate::clients::lcu::models::{LcuEventType, Summoner};
+use crate::clients::lcu::models::{LcuEventType, RegionLocale, Summoner};
 use crate::clients::lcu::ws::LcuSocket;
+use crate::clients::sgp::http::SgpClient;
+use crate::clients::sgp::servers;
 use crate::error::Result;
 use crate::state::gameflow::PHASE_NONE;
+use crate::state::session::LcuSession;
 use crate::state::{AppState, ClientInfo, ConnectionStatus};
 
 const SCAN_INTERVAL: Duration = Duration::from_secs(2);
@@ -23,6 +28,7 @@ const UNREADABLE_HINT: &str =
 const CURRENT_SUMMONER: &str = "/lol-summoner/v1/current-summoner";
 const GAMEFLOW_PHASE: &str = "/lol-gameflow/v1/gameflow-phase";
 const PLATFORM_ID: &str = "/lol-platform-config/v1/namespaces/LoginDataPacket/platformId";
+const REGION_LOCALE: &str = "/riotclient/region-locale";
 
 pub fn spawn(app: AppHandle) {
     tauri::async_runtime::spawn(supervise(app));
@@ -60,6 +66,7 @@ async fn run_session(app: &AppHandle, creds: &Credentials) -> Result<()> {
             port: creds.port,
             platform_id: creds.platform_id.clone(),
             source: creds.source,
+            sgp_server: None,
         });
     });
 
@@ -73,6 +80,17 @@ async fn run_session(app: &AppHandle, creds: &Credentials) -> Result<()> {
         Some(id) => Some(id.clone()),
         None => http.get::<String>(PLATFORM_ID).await.ok(),
     };
+    let locale: Result<RegionLocale> = http.get(REGION_LOCALE).await;
+    let region = locale.map(|l| l.region).unwrap_or_default();
+    let sgp = connect_sgp(&region, platform_id.as_deref());
+    let sgp_server = sgp.as_ref().map(|c| c.server().server.name.clone());
+
+    let session = LcuSession {
+        http,
+        sgp,
+        game_data: OnceCell::new(),
+    };
+    state.set_session(Some(Arc::new(session)));
 
     state.update_lcu(|s| {
         s.status = ConnectionStatus::Connected;
@@ -80,6 +98,7 @@ async fn run_session(app: &AppHandle, creds: &Credentials) -> Result<()> {
         s.last_error = None;
         if let Some(client) = &mut s.client {
             client.platform_id = platform_id;
+            client.sgp_server = sgp_server;
         }
     });
     state.set_gameflow_phase(phase.unwrap_or_else(|_| PHASE_NONE.to_owned()));
@@ -87,6 +106,22 @@ async fn run_session(app: &AppHandle, creds: &Credentials) -> Result<()> {
 
     let router = event_router(app.clone());
     socket.run(|event| router.dispatch(&event)).await
+}
+
+/// SGP is optional: without a configured server everything falls back to LCU.
+fn connect_sgp(region: &str, platform_id: Option<&str>) -> Option<SgpClient> {
+    let Some(server) = platform_id.and_then(|p| servers::resolve(region, p)) else {
+        log::warn!("no SGP server for region={region} platform={platform_id:?}, LCU only");
+        return None;
+    };
+    log::info!("using SGP server {}", server.id);
+    match SgpClient::new(server) {
+        Ok(client) => Some(client),
+        Err(err) => {
+            log::warn!("failed to create SGP client: {err}");
+            None
+        }
+    }
 }
 
 /// The UX process accepts connections a little before its plugins are ready.

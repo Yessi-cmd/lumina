@@ -2,8 +2,10 @@ use std::time::Duration;
 
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
+use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
+use reqwest::{RequestBuilder, Response};
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use super::discovery::Credentials;
 use crate::error::{AppError, Result};
@@ -57,8 +59,40 @@ impl LcuHttp {
     }
 
     pub async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
-        let url = format!("{}{path}", self.base_url);
-        let resp = self.client.get(url).send().await?;
+        let request = self.client.get(self.url(path));
+        let resp = Self::send(request, path).await?;
+        Ok(resp.json().await?)
+    }
+
+    pub async fn post<B, T>(&self, path: &str, body: &B) -> Result<T>
+    where
+        B: Serialize + ?Sized,
+        T: DeserializeOwned,
+    {
+        let request = self.client.post(self.url(path)).json(body);
+        let resp = Self::send(request, path).await?;
+        Ok(resp.json().await?)
+    }
+
+    /// Raw bytes and content type, for game assets such as icons.
+    pub async fn get_bytes(&self, path: &str) -> Result<(Vec<u8>, Option<String>)> {
+        let request = self.client.get(self.url(path));
+        let resp = Self::send(request, path).await?;
+        let content_type = resp
+            .headers()
+            .get(CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_owned);
+        let body = resp.bytes().await?;
+        Ok((body.to_vec(), content_type))
+    }
+
+    fn url(&self, path: &str) -> String {
+        format!("{}{path}", self.base_url)
+    }
+
+    async fn send(request: RequestBuilder, path: &str) -> Result<Response> {
+        let resp = request.send().await?;
         let status = resp.status();
         if !status.is_success() {
             return Err(AppError::LcuStatus {
@@ -66,6 +100,6 @@ impl LcuHttp {
                 path: path.to_owned(),
             });
         }
-        Ok(resp.json().await?)
+        Ok(resp)
     }
 }

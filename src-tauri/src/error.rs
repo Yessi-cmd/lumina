@@ -13,6 +13,12 @@ pub enum AppError {
     #[error("LCU 返回 {status}: {path}")]
     LcuStatus { status: u16, path: String },
 
+    #[error("SGP 返回 {0}")]
+    SgpStatus(u16),
+
+    #[error("未连接到英雄联盟客户端")]
+    NotConnected,
+
     #[error("WebSocket 错误: {0}")]
     WebSocket(Box<tokio_tungstenite::tungstenite::Error>),
 
