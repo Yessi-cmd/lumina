@@ -71,9 +71,14 @@ export interface GameSummary {
   position: string;
   teamId: number;
   visionScore: number;
+  /** Keystone rune and secondary tree; 0 when unknown. */
+  keystone: number;
+  subStyle: number;
+  /** 2 = double kill ... 5 = penta kill. */
+  largestMultiKill: number;
   /** Team-relative figures; only SGP lists every participant, so LCU pages have none. */
   metrics: GameMetrics | null;
-  participants: { puuid: string; teamId: number }[];
+  participants: { puuid: string; teamId: number; championId: number }[];
 }
 
 /** Shares are fractions of the team total (0.25 = 25%). */
@@ -217,12 +222,64 @@ export interface PlayerLine {
   assists: number;
   spells: [number, number];
   items: number[];
+  runes: GameRunes;
   cs: number;
   gold: number;
   damageToChampions: number;
+  physicalDamage: number;
+  magicDamage: number;
+  trueDamage: number;
   damageTaken: number;
+  damageMitigated: number;
+  healing: number;
+  shielding: number;
+  buildingDamage: number;
   visionScore: number;
+  wardsPlaced: number;
+  wardsKilled: number;
+  controlWards: number;
+  ccSeconds: number;
+  /** Double, triple, quadra and penta kills. */
+  multiKills: number[];
+  firstBlood: boolean;
   position: string;
+}
+
+export interface GameRunes {
+  primaryStyle: number;
+  subStyle: number;
+  /** Four primary runes (keystone first), then two secondary runes. */
+  perks: number[];
+  /** Offense, flex and defense stat shards. */
+  shards: number[];
+}
+
+export interface TeamObjectives {
+  baron: number;
+  dragon: number;
+  herald: number;
+  grubs: number;
+  atakhan: number;
+  tower: number;
+  inhibitor: number;
+}
+
+export interface TeamDetail {
+  teamId: number;
+  win: boolean;
+  kills: number;
+  gold: number;
+  bans: number[];
+  objectives: TeamObjectives;
+  players: PlayerLine[];
+}
+
+export interface PlayerBuild {
+  puuid: string;
+  /** Purchases in order; `at` is seconds into the game. */
+  items: { itemId: number; at: number }[];
+  /** Skill slot per level: 1 = Q, 2 = W, 3 = E, 4 = R. */
+  skills: number[];
 }
 
 export interface GameDetail {
@@ -233,7 +290,7 @@ export interface GameDetail {
   duration: number;
   source: DataSource;
   /** Blue side (100) first. */
-  teams: { teamId: number; win: boolean; kills: number; gold: number; players: PlayerLine[] }[];
+  teams: TeamDetail[];
 }
 
 export type TagTone = "positive" | "negative" | "warning" | "neutral";
@@ -315,6 +372,8 @@ export interface Settings {
   statsTier: string;
   /** Rank filter for matchups: emerald_plus / diamond_plus / master_plus. */
   matchupTier: string;
+  /** Folder of LeagueClientUx.exe, remembered so no admin rights are needed; "" when unknown. */
+  clientDir: string;
 }
 
 export interface PendingAccept {
@@ -335,6 +394,7 @@ export const api = {
     invoke<MatchHistoryPage>("match_history", { puuid, start, count }),
   gameData: () => invoke<GameData>("game_data"),
   gameDetail: (gameId: number) => invoke<GameDetail>("game_detail", { gameId }),
+  gameBuilds: (gameId: number) => invoke<PlayerBuild[]>("game_builds", { gameId }),
   championTierList: (position: string) => invoke<TierEntry[]>("champion_tier_list", { position }),
   championBuild: (championId: number, position: string) =>
     invoke<ChampionBuild>("champion_build", { championId, position }),

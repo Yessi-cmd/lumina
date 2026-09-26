@@ -36,6 +36,8 @@
 - **发现**：每 2s 扫描 `LeagueClientUx.exe`，解析命令行 `--app-port`、`--remoting-auth-token`、`--rso_platform_id`。
 - **降级**：腾讯服客户端以管理员运行时读不到命令行，改读安装目录 `lockfile`（`name:pid:port:password:protocol`），无需提权。
   lockfile 也读不到时，与 League Akari 一样提示「以管理员身份重启」（`services/elevation.rs`，经 UAC 启动提权实例）。
+- **记住客户端目录**：任何一次能看到进程路径的连接（通常是管理员运行时）都会把 `LeagueClientUx.exe` 所在目录写入设置 `clientDir`；
+  之后普通权限启动时直接读该目录下的 lockfile，并且只在其中的 pid 正在运行时采用，避免读到崩溃遗留的旧文件。
 - **HTTP**：reqwest + Basic Auth（`riot:<token>`），编译期嵌入 `riotgames.pem` 作为唯一信任根（关闭系统根证书）。
   LCU 证书链到 Riot 2013 年的 v1/SHA-1 根证书，webpki（rustls）不接受，因此 LCU 用 native-tls（SChannel）；
   叶子证书不是签给 `127.0.0.1` 的，所以只跳过主机名校验，证书链照常校验。
