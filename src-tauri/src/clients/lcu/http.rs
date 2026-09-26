@@ -3,7 +3,7 @@ use std::time::Duration;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
-use reqwest::{RequestBuilder, Response};
+use reqwest::{Method, RequestBuilder, Response};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -77,6 +77,19 @@ impl LcuHttp {
     /// POST without a body, for actions that answer 204 No Content.
     pub async fn post_empty(&self, path: &str) -> Result<()> {
         let request = self.client.post(self.url(path));
+        Self::send(request, path).await?;
+        Ok(())
+    }
+
+    /// Sends a JSON body (or none) and ignores whatever comes back.
+    pub async fn send_json<B>(&self, method: Method, path: &str, body: Option<&B>) -> Result<()>
+    where
+        B: Serialize + ?Sized,
+    {
+        let mut request = self.client.request(method, self.url(path));
+        if let Some(body) = body {
+            request = request.json(body);
+        }
         Self::send(request, path).await?;
         Ok(())
     }

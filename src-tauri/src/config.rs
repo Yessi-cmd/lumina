@@ -9,6 +9,9 @@ use crate::error::{AppError, Result};
 
 const FILE_NAME: &str = "settings.json";
 pub const MAX_ACCEPT_DELAY_SECS: u32 = 10;
+/// lolalytics rank filters offered in settings.
+pub const STATS_TIERS: [&str; 4] = ["all", "platinum_plus", "emerald_plus", "diamond_plus"];
+const DEFAULT_STATS_TIER: &str = "emerald_plus";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -18,6 +21,8 @@ pub struct Settings {
     pub auto_accept_delay_secs: u32,
     /// Bring the window forward when champ select starts and when the game loads.
     pub auto_show_panel: bool,
+    /// Rank filter for champion tiers and builds, one of `STATS_TIERS`.
+    pub stats_tier: String,
 }
 
 impl Default for Settings {
@@ -26,6 +31,7 @@ impl Default for Settings {
             auto_accept: false,
             auto_accept_delay_secs: 2,
             auto_show_panel: true,
+            stats_tier: DEFAULT_STATS_TIER.to_owned(),
         }
     }
 }
@@ -63,6 +69,9 @@ impl Settings {
 
     pub fn normalized(mut self) -> Self {
         self.auto_accept_delay_secs = self.auto_accept_delay_secs.min(MAX_ACCEPT_DELAY_SECS);
+        if !STATS_TIERS.contains(&self.stats_tier.as_str()) {
+            self.stats_tier = DEFAULT_STATS_TIER.to_owned();
+        }
         self
     }
 }
@@ -83,6 +92,7 @@ mod tests {
         let s = s.normalized();
         assert!(!s.auto_accept);
         assert!(s.auto_show_panel);
+        assert_eq!(s.stats_tier, DEFAULT_STATS_TIER);
         assert_eq!(s.auto_accept_delay_secs, MAX_ACCEPT_DELAY_SECS);
     }
 }

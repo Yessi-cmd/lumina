@@ -41,7 +41,10 @@ pub fn run() {
             commands::log_dir,
             commands::open_log_dir,
             commands::log_frontend,
-            commands::game_detail
+            commands::game_detail,
+            commands::champion_tier_list,
+            commands::champion_build,
+            commands::apply_build
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

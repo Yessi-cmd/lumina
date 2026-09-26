@@ -135,6 +135,8 @@ pub struct LcuPlayer {
 pub struct LcuChampion {
     pub id: i64,
     pub name: String,
+    /// English id such as `Garen` or `MonkeyKing`.
+    pub alias: String,
     pub square_portrait_path: String,
 }
 
@@ -143,7 +145,32 @@ pub struct LcuChampion {
 #[serde(default, rename_all = "camelCase")]
 pub struct LcuIconAsset {
     pub id: i64,
+    pub name: String,
     pub icon_path: String,
+}
+
+/// `/lol-game-data/assets/v1/perkstyles.json`
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct LcuPerkStyles {
+    pub styles: Vec<LcuIconAsset>,
+}
+
+/// `/lol-perks/v1/pages` entries.
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct LcuPerkPage {
+    pub id: i64,
+    pub name: String,
+    pub is_deletable: bool,
+    pub is_editable: bool,
+}
+
+/// `/lol-champions/v1/owned-champions-minimal` entries.
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct LcuOwnedChampion {
+    pub id: i64,
 }
 
 /// `/lol-game-queues/v1/queues`
@@ -173,6 +200,8 @@ pub struct ChampSelectMember {
     pub champion_id: i64,
     pub champion_pick_intent: i64,
     pub assigned_position: String,
+    pub spell1_id: i64,
+    pub spell2_id: i64,
     /// `HIDDEN` for anonymized players (every opponent on the Chinese servers).
     pub name_visibility_type: String,
 }

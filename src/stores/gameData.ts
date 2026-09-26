@@ -50,11 +50,29 @@ export const useGameDataStore = defineStore("gameData", () => {
     return path ? assetUrl(path) : "";
   }
 
+  function perkIcon(id: number): string {
+    const path = data.value?.perkIcons[id];
+    return path ? assetUrl(path) : "";
+  }
+
+  function perkName(id: number): string {
+    return data.value?.perkNames[id] ?? String(id);
+  }
+
   function queueName(queueId: number, gameMode: string): string {
     return data.value?.queueNames[queueId] || gameMode || `队列 ${queueId}`;
   }
 
-  return { data, championName, championIcon, itemIcon, spellIcon, queueName };
+  return {
+    data,
+    championName,
+    championIcon,
+    itemIcon,
+    spellIcon,
+    perkIcon,
+    perkName,
+    queueName,
+  };
 });
 
 export function profileIconUrl(iconId: number): string {

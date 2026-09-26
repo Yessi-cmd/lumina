@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { RosterPlayer, TagTone } from "../api";
+import ChampionAssistant from "../components/champion/ChampionAssistant.vue";
 import PlayerCard from "../components/player/PlayerCard.vue";
 import { useGameDataStore } from "../stores/gameData";
 import { useLcuStore } from "../stores/lcu";
@@ -11,6 +12,7 @@ const ongoing = useOngoingStore();
 const gd = useGameDataStore();
 
 const roster = computed(() => ongoing.roster);
+const me = computed(() => roster.value?.allies.find((p) => p.isSelf));
 const insights = computed(() => ongoing.insights);
 const title = computed(() => {
   const r = roster.value;
@@ -82,7 +84,12 @@ function championOf(puuid: string): number {
         </div>
 
         <div class="flex flex-col gap-2">
-          <h2 class="text-sm font-medium text-red-300">敌方</h2>
+          <ChampionAssistant
+            v-if="roster.stage === 'champSelect'"
+            :position="me?.position ?? ''"
+            :champion-id="me?.championId ?? 0"
+          />
+          <h2 v-else class="text-sm font-medium text-red-300">敌方</h2>
           <PlayerCard
             v-for="p in roster.enemies"
             :key="p.puuid"
@@ -98,13 +105,10 @@ function championOf(puuid: string): number {
             开始排队并进入英雄选择后显示队友，进入加载界面后显示敌方。
           </div>
           <div
-            v-if="roster.hiddenEnemies > 0"
+            v-if="roster.hiddenEnemies > 0 && roster.stage !== 'champSelect'"
             class="rounded-lg border border-dashed border-zinc-800 p-4 text-center text-sm text-zinc-500"
           >
-            <template v-if="roster.stage === 'champSelect'">
-              英雄选择阶段客户端不提供敌方身份，进入加载界面后自动显示。
-            </template>
-            <template v-else>{{ roster.hiddenEnemies }} 名敌方玩家身份不可见。</template>
+            {{ roster.hiddenEnemies }} 名敌方玩家身份不可见。
           </div>
         </div>
       </div>

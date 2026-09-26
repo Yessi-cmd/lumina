@@ -117,7 +117,7 @@ function openHistory() {
 
 <template>
   <div
-    class="flex w-full cursor-pointer items-start gap-3 rounded-lg border bg-zinc-900 p-3 hover:bg-zinc-800/80"
+    class="flex w-full cursor-pointer items-start gap-2.5 rounded-lg border bg-zinc-900 px-2.5 py-2 hover:bg-zinc-800/80"
     :class="player.isSelf ? 'border-amber-500/60' : 'border-zinc-800'"
     @click="openHistory"
   >
@@ -126,9 +126,9 @@ function openHistory() {
         v-if="player.championId > 0"
         :src="gd.championIcon(player.championId)"
         :title="gd.championName(player.championId)"
-        class="size-12 rounded-md bg-zinc-800"
+        class="size-10 rounded-md bg-zinc-800"
       />
-      <div v-else class="size-12 rounded-md bg-zinc-800" />
+      <div v-else class="size-10 rounded-md bg-zinc-800" />
       <span
         v-if="POSITIONS[player.position]"
         class="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded bg-zinc-950 px-1 text-[10px] text-zinc-300"
@@ -153,7 +153,7 @@ function openHistory() {
         </span>
       </div>
 
-      <div v-if="tags.length" class="mt-1 flex flex-wrap gap-1" @click.stop>
+      <div v-if="tags.length" class="mt-0.5 flex flex-wrap gap-1" @click.stop>
         <TagChip v-for="tag in shownTags" :key="tag.id + tag.label" :tag="tag" />
         <span
           v-if="hiddenTags.length"
@@ -168,7 +168,7 @@ function openHistory() {
       <p v-else-if="!profile" class="mt-1 text-xs text-zinc-500">加载战绩…</p>
       <p v-else-if="profile.sampleGames === 0" class="mt-1 text-xs text-zinc-500">近期没有对局</p>
       <template v-else>
-        <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+        <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
           <span :class="winRateClass" :title="`样本：近期${SCOPES[profile.scope]}对局`">
             胜率 {{ percent(profile.winRate) }}
             <span class="text-zinc-500">
@@ -193,7 +193,7 @@ function openHistory() {
           <span>经济 {{ percent(profile.team.goldShare) }}</span>
           <span>参团 {{ percent(profile.team.killParticipation) }}</span>
         </div>
-        <div class="mt-1.5 flex items-center gap-3">
+        <div class="mt-1 flex items-center gap-3">
           <div class="flex gap-0.5">
             <span
               v-for="(r, i) in profile.recent"

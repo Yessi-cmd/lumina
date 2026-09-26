@@ -103,10 +103,59 @@ export interface MatchHistoryPage {
 
 /** Icon values are LCU asset paths; pass them through `assetUrl`. */
 export interface GameData {
-  champions: Record<string, { name: string; icon: string }>;
+  champions: Record<string, { name: string; icon: string; alias: string }>;
   itemIcons: Record<string, string>;
   spellIcons: Record<string, string>;
   queueNames: Record<string, string>;
+  /** Runes, rune trees and stat shards. */
+  perkIcons: Record<string, string>;
+  perkNames: Record<string, string>;
+}
+
+export interface TierEntry {
+  championId: number;
+  rank: number;
+  tier: string;
+  /** Percentages, e.g. 52.3. */
+  winRate: number;
+  pickRate: number;
+  banRate: number;
+  games: number;
+  owned: boolean;
+}
+
+export interface RunePage {
+  primaryStyle: number;
+  subStyle: number;
+  /** Four primary runes, two secondary runes, three stat shards. */
+  perks: number[];
+}
+
+export interface BuildVariant {
+  label: string;
+  runeWinRate: number;
+  runeGames: number;
+  runes: RunePage;
+  spells: number[];
+  skillPriority: string;
+  skillOrder: string;
+  startItems: number[];
+  coreItems: number[];
+}
+
+export interface ChampionBuild {
+  championId: number;
+  position: string;
+  tier: string;
+  rank: number;
+  rankTotal: number;
+  winRate: number;
+  pickRate: number;
+  banRate: number;
+  games: number;
+  strongAgainst: number[];
+  weakAgainst: number[];
+  variants: BuildVariant[];
 }
 
 export type RosterStage = "lobby" | "champSelect" | "inGame";
@@ -236,6 +285,8 @@ export interface Settings {
   autoAcceptDelaySecs: number;
   /** Bring the window forward when champ select starts and when the game loads. */
   autoShowPanel: boolean;
+  /** lolalytics rank filter: all / platinum_plus / emerald_plus / diamond_plus. */
+  statsTier: string;
 }
 
 export interface PendingAccept {
@@ -256,6 +307,11 @@ export const api = {
     invoke<MatchHistoryPage>("match_history", { puuid, start, count }),
   gameData: () => invoke<GameData>("game_data"),
   gameDetail: (gameId: number) => invoke<GameDetail>("game_detail", { gameId }),
+  championTierList: (position: string) => invoke<TierEntry[]>("champion_tier_list", { position }),
+  championBuild: (championId: number, position: string) =>
+    invoke<ChampionBuild>("champion_build", { championId, position }),
+  applyBuild: (title: string, variant: BuildVariant) =>
+    invoke<void>("apply_build", { title, variant }),
   ongoingRoster: () => invoke<Roster | null>("ongoing_roster"),
   playerProfile: (puuid: string, championId: number, queueId: number, position: string) =>
     invoke<PlayerProfile>("player_profile", { puuid, championId, queueId, position }),

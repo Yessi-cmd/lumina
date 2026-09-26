@@ -95,6 +95,14 @@ Lumina 把分析全部放到 Rust，并做了这些增强：
 - **建议**：敌方软柿子与硬骨头、最大优势路与劣势路；选人阶段只有我方信息时提示需要照顾的队友。
 - 所有阈值在各模块的 `limits` 中，均有单元测试。
 
+### 3.3.4 选英雄助手（`clients/lolalytics.rs`、`services/champion_assist.rs`）
+- 数据：lolalytics 网站自用接口 `a1.lolalytics.com/mega/`：`ep=list`（某位置全部英雄的排名、Tier 1–15、胜率/选取/禁用）
+  与 `ep=build-full`（`c` 为小写英文名，含最常用/最高胜率两套符文、召唤师技能、加点、出门装、核心装、克制关系）。
+  外服排位（queue=420，近 30 天），分段由设置 `statsTier` 决定，默认翡翠及以上。非官方接口，内存缓存 6 小时。
+- 已拥有英雄：LCU `/lol-champions/v1/owned-champions-minimal`。
+- 一键应用：删除旧的 `Lumina` 前缀符文页后新建；页数已满时改写当前可编辑页。
+  召唤师技能用 `PATCH /lol-champ-select/v1/session/my-selection`，保持玩家原来闪现所在的键位。
+
 ### 3.4 性能
 - 战绩请求并发上限 5（`tokio::sync::Semaphore`）。
 - LRU 缓存 `(puuid, 分页)`，TTL 5 分钟。

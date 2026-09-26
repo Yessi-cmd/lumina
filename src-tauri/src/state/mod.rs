@@ -14,6 +14,7 @@ use crate::clients::lcu::models::Summoner;
 use crate::config::Settings;
 use crate::error::{AppError, Result};
 use crate::services::auto_accept::AutoAccept;
+use crate::services::champion_assist::ChampionAssist;
 use crate::services::game_detail::GameDetailService;
 use crate::services::match_history::MatchHistoryService;
 use crate::services::timeline::TimelineService;
@@ -77,6 +78,7 @@ pub struct AppState {
     pub timelines: TimelineService,
     pub auto_accept: AutoAccept,
     pub game_details: GameDetailService,
+    pub champion_assist: ChampionAssist,
 }
 
 impl AppState {
@@ -92,6 +94,7 @@ impl AppState {
             timelines: TimelineService::default(),
             auto_accept: AutoAccept::default(),
             game_details: GameDetailService::default(),
+            champion_assist: ChampionAssist::default(),
         }
     }
 

@@ -7,6 +7,7 @@ use crate::error::Result;
 use crate::logging;
 use crate::services;
 use crate::services::auto_accept::Pending;
+use crate::services::champion_assist::{BuildVariant, ChampionBuild, TierEntry};
 use crate::services::game_data::GameData;
 use crate::services::game_detail::GameDetail;
 use crate::services::match_history::MatchHistoryPage;
@@ -153,4 +154,39 @@ pub fn log_frontend(level: String, message: String) {
 pub async fn game_detail(state: State<'_, AppState>, game_id: i64) -> Result<GameDetail> {
     let session = state.session()?;
     state.game_details.get(&session, game_id).await
+}
+
+/// Champions ranked for a position, from lolalytics at the configured rank filter.
+#[tauri::command]
+pub async fn champion_tier_list(
+    state: State<'_, AppState>,
+    position: String,
+) -> Result<Vec<TierEntry>> {
+    let session = state.session()?;
+    let tier = state.settings().stats_tier;
+    let assist = &state.champion_assist;
+    assist.tier_list(&session, &position, &tier).await
+}
+
+#[tauri::command]
+pub async fn champion_build(
+    state: State<'_, AppState>,
+    champion_id: i64,
+    position: String,
+) -> Result<ChampionBuild> {
+    let session = state.session()?;
+    let tier = state.settings().stats_tier;
+    let assist = &state.champion_assist;
+    assist.build(&session, champion_id, &position, &tier).await
+}
+
+/// Writes a build's runes and summoner spells into the client.
+#[tauri::command]
+pub async fn apply_build(
+    state: State<'_, AppState>,
+    title: String,
+    variant: BuildVariant,
+) -> Result<()> {
+    let session = state.session()?;
+    services::champion_assist::apply(&session, &title, &variant).await
 }

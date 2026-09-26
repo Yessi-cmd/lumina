@@ -77,6 +77,23 @@ function onDelayInput(event: Event) {
         />
       </label>
 
+      <div class="mt-4 flex items-center justify-between gap-4 border-t border-zinc-800 pt-4">
+        <div>
+          <div class="font-medium">英雄数据分段</div>
+          <div class="text-sm text-zinc-400">选英雄助手的强度和出装按哪个分段统计（数据来自 lolalytics）。</div>
+        </div>
+        <select
+          class="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-sm"
+          :value="s.statsTier"
+          @change="store.update({ statsTier: ($event.target as HTMLSelectElement).value })"
+        >
+          <option value="all">全分段</option>
+          <option value="platinum_plus">铂金及以上</option>
+          <option value="emerald_plus">翡翠及以上</option>
+          <option value="diamond_plus">钻石及以上</option>
+        </select>
+      </div>
+
       <p v-if="store.saveError" class="mt-3 text-sm text-red-400">{{ store.saveError }}</p>
     </div>
 
