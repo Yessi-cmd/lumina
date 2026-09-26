@@ -1,4 +1,5 @@
 pub mod auto_accept;
+pub mod career;
 pub mod champion_assist;
 pub mod champion_mastery;
 pub mod client_window;

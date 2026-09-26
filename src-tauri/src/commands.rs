@@ -7,6 +7,7 @@ use crate::error::Result;
 use crate::logging;
 use crate::services;
 use crate::services::auto_accept::Pending;
+use crate::services::career::{Career, Range};
 use crate::services::champion_assist::{BuildVariant, ChampionBuild, MatchupReport, TierEntry};
 use crate::services::draft::Draft;
 use crate::services::game_data::GameData;
@@ -139,6 +140,19 @@ pub fn save_settings(
 #[tauri::command]
 pub fn draft_state() -> Option<Draft> {
     services::draft::latest()
+}
+
+/// Career analysis of one player; `queue` narrows it to one mode.
+#[tauri::command]
+pub async fn career(
+    state: State<'_, AppState>,
+    puuid: String,
+    queue: Option<i64>,
+    range: Range,
+) -> Result<Career> {
+    let session = state.session()?;
+    let history = &state.match_history;
+    services::career::load(history, &session, &puuid, queue, range).await
 }
 
 /// A teammate's most played champions in recent solo/duo games.

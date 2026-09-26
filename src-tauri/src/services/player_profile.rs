@@ -1017,6 +1017,7 @@ mod tests {
             largest_multi_kill: 0,
             metrics: None,
             participants: Vec::new(),
+            comparison: None,
         }
     }
 

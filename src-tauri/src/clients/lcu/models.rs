@@ -194,6 +194,12 @@ pub struct LcuIconAsset {
     pub id: i64,
     pub name: String,
     pub icon_path: String,
+    /// Items and spells; items use the client's markup tags.
+    pub description: String,
+    /// Runes.
+    pub short_desc: String,
+    /// Items: total cost in gold.
+    pub price_total: i64,
 }
 
 /// `/lol-game-data/assets/v1/perkstyles.json`

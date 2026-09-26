@@ -85,6 +85,34 @@ pub struct GameSummary {
     pub metrics: Option<GameMetrics>,
     /// Everyone in the game (SGP only), for premade and "met before" detection.
     pub participants: Vec<GameParticipant>,
+    /// The player against the others in the same game (SGP only). Matchmaking puts
+    /// players of similar rank together, so this doubles as a same-rank comparison.
+    pub comparison: Option<Comparison>,
+}
+
+/// Per-minute performance of one player, or an average over several.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Rates {
+    pub damage: f64,
+    pub damage_taken: f64,
+    pub gold: f64,
+    pub cs: f64,
+    pub vision: f64,
+    /// Fraction of the team's kills the player took part in.
+    pub kill_participation: f64,
+    /// Deaths per 10 minutes.
+    pub deaths: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Comparison {
+    pub me: Rates,
+    /// Average of the other players in the game.
+    pub peers: Rates,
+    /// The enemy on the same position, when positions are known.
+    pub opponent: Option<Rates>,
 }
 
 /// Shares are fractions of the player's team total (0.25 = 25%).
@@ -289,10 +317,16 @@ fn sgp_summary(game: SgpGameJson, puuid: &str) -> Option<GameSummary> {
         p.team_early_surrendered,
     );
     // Arena groups players into subteams, which team shares do not describe.
-    let metrics = if game.game_mode == "CHERRY" {
+    let arena = game.game_mode == "CHERRY";
+    let metrics = if arena {
         None
     } else {
         Some(sgp_metrics(all, p))
+    };
+    let comparison = if arena {
+        None
+    } else {
+        Some(comparison(all, p, game.game_duration))
     };
     let participants = all
         .iter()
@@ -331,7 +365,66 @@ fn sgp_summary(game: SgpGameJson, puuid: &str) -> Option<GameSummary> {
         largest_multi_kill: p.largest_multi_kill,
         metrics,
         participants,
+        comparison,
     })
+}
+
+fn comparison(all: &[SgpParticipant], me: &SgpParticipant, duration: i64) -> Comparison {
+    let minutes = (duration as f64 / 60.0).max(1.0);
+    let rates = |p: &SgpParticipant| rates(all, p, minutes);
+    let mut peers = Vec::new();
+    for p in all {
+        if p.puuid != me.puuid {
+            peers.push(rates(p));
+        }
+    }
+    let lane = &me.team_position;
+    let opponent = all.iter().find(|p| {
+        let enemy = p.team_id != me.team_id;
+        enemy && !lane.is_empty() && p.team_position == *lane
+    });
+    Comparison {
+        me: rates(me),
+        peers: average_rates(&peers),
+        opponent: opponent.map(rates),
+    }
+}
+
+fn rates(all: &[SgpParticipant], p: &SgpParticipant, minutes: f64) -> Rates {
+    let mut team_kills = 0;
+    for other in all {
+        if other.team_id == p.team_id {
+            team_kills += other.kills;
+        }
+    }
+    let cs = p.total_minions_killed + p.neutral_minions_killed;
+    Rates {
+        damage: p.total_damage_dealt_to_champions as f64 / minutes,
+        damage_taken: p.total_damage_taken as f64 / minutes,
+        gold: p.gold_earned as f64 / minutes,
+        cs: cs as f64 / minutes,
+        vision: p.vision_score as f64 / minutes,
+        kill_participation: ratio(p.kills + p.assists, team_kills),
+        deaths: p.deaths as f64 * 10.0 / minutes,
+    }
+}
+
+/// Field-by-field mean; all zero for no input.
+pub fn average_rates(all: &[Rates]) -> Rates {
+    if all.is_empty() {
+        return Rates::default();
+    }
+    let n = all.len() as f64;
+    let mean = |f: fn(&Rates) -> f64| all.iter().map(f).sum::<f64>() / n;
+    Rates {
+        damage: mean(|r| r.damage),
+        damage_taken: mean(|r| r.damage_taken),
+        gold: mean(|r| r.gold),
+        cs: mean(|r| r.cs),
+        vision: mean(|r| r.vision),
+        kill_participation: mean(|r| r.kill_participation),
+        deaths: mean(|r| r.deaths),
+    }
 }
 
 fn keystone(p: &SgpParticipant) -> i64 {
@@ -428,6 +521,7 @@ fn lcu_summary(game: LcuGame, puuid: &str) -> Option<GameSummary> {
         largest_multi_kill: s.largest_multi_kill,
         metrics: None,
         participants: Vec::new(),
+        comparison: None,
     })
 }
 

@@ -23,6 +23,9 @@ use crate::state::{AppState, ClientInfo, ConnectionStatus};
 const SCAN_INTERVAL: Duration = Duration::from_secs(2);
 /// How long to wait for a freshly started client to answer API calls.
 const READY_ATTEMPTS: u32 = 30;
+/// A starting client briefly shows a process without readable credentials; only after
+/// this many scans in a row is it worth asking for administrator rights.
+const UNREADABLE_SCANS: u32 = 5;
 const UNREADABLE_HINT: &str =
     "检测到英雄联盟客户端，但无法读取连接信息，需要以管理员身份运行 Lumina。";
 
@@ -36,11 +39,13 @@ pub fn spawn(app: AppHandle) {
 }
 
 async fn supervise(app: AppHandle) {
+    let mut unreadable = 0;
     loop {
         let scan = tauri::async_runtime::spawn_blocking(discovery::discover).await;
         let state = app.state::<AppState>();
         match scan {
             Ok(Discovery::Found(creds)) => {
+                unreadable = 0;
                 log::info!("found League client: {creds:?}");
                 if let Err(err) = run_session(&app, &creds).await {
                     log::warn!("LCU session ended: {err}");
@@ -49,8 +54,18 @@ async fn supervise(app: AppHandle) {
                     state.reset_lcu(None);
                 }
             }
-            Ok(Discovery::Unreadable) => state.mark_needs_admin(UNREADABLE_HINT),
-            Ok(Discovery::NotRunning) => state.reset_lcu(None),
+            Ok(Discovery::Unreadable) => {
+                unreadable += 1;
+                if unreadable >= UNREADABLE_SCANS {
+                    state.mark_needs_admin(UNREADABLE_HINT);
+                } else {
+                    state.update_lcu(|s| s.status = ConnectionStatus::Connecting);
+                }
+            }
+            Ok(Discovery::NotRunning) => {
+                unreadable = 0;
+                state.reset_lcu(None);
+            }
             Err(err) => log::error!("process scan failed: {err}"),
         }
         tokio::time::sleep(SCAN_INTERVAL).await;
@@ -62,6 +77,8 @@ async fn run_session(app: &AppHandle, creds: &Credentials) -> Result<()> {
     let state = app.state::<AppState>();
     state.update_lcu(|s| {
         s.status = ConnectionStatus::Connecting;
+        s.needs_admin = false;
+        s.last_error = None;
         s.client = Some(ClientInfo {
             pid: creds.pid,
             port: creds.port,
