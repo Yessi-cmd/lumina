@@ -1,5 +1,6 @@
 pub mod auto_accept;
 pub mod champion_assist;
+pub mod champion_mastery;
 pub mod elevation;
 pub mod game_data;
 pub mod game_detail;

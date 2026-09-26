@@ -18,10 +18,14 @@ use crate::state::ongoing::Roster;
 use crate::state::session::LcuSession;
 use crate::state::AppState;
 
+/// Solo/duo and flex: normal, ARAM and bot games say little about how someone plays
+/// ranked, so the power index, laning and gank habits read only these.
+const RANKED_QUEUES: [i64; 2] = [420, 440];
+/// Ranked games per player, fetched on top of the shared page so players who mostly
+/// play other modes still get a ranked sample.
+const RANKED_GAMES: u32 = 20;
 /// Recent ranked games per player whose timelines are read.
 const TIMELINE_GAMES: usize = 8;
-/// Solo/duo and flex: laning in normal games says little about laning in ranked.
-const TIMELINE_QUEUES: [i64; 2] = [420, 440];
 
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -55,8 +59,9 @@ pub async fn load(state: &AppState) -> Result<RosterInsights> {
 
     let now = roster_relations::now_ms();
     let relations = roster_relations::analyze(&roster, &self_puuid, &pages, now);
-    let profiles = profiles(&roster, &pages);
-    let early = early_stats(state, &session, &roster, &pages).await;
+    let ranked = ranked_games(state, &session, &roster, &pages).await;
+    let profiles = profiles(&roster, &pages, &ranked);
+    let early = early_stats(state, &session, &ranked).await;
     let matchup = matchup::analyze(&roster, &profiles, &early);
 
     let from_sgp = pages.iter().filter(|p| p.source == DataSource::Sgp);
@@ -82,8 +87,46 @@ pub async fn load(state: &AppState) -> Result<RosterInsights> {
     })
 }
 
-/// Profiles judged in the context of this game, as the player cards show them.
-fn profiles(roster: &Roster, pages: &[MatchHistoryPage]) -> HashMap<String, PlayerProfile> {
+/// Each roster player's recent ranked games, newest first: the shared page plus one
+/// page per ranked queue, which SGP filters on the server.
+async fn ranked_games(
+    state: &AppState,
+    session: &LcuSession,
+    roster: &Roster,
+    pages: &[MatchHistoryPage],
+) -> HashMap<String, Vec<GameSummary>> {
+    let history = &state.match_history;
+    let requests = roster.puuids().map(|puuid| async move {
+        let mut games = Vec::new();
+        if let Some(page) = pages.iter().find(|p| p.puuid == puuid) {
+            games.extend(page.games.iter().cloned());
+        }
+        if session.sgp.is_some() {
+            for queue in RANKED_QUEUES {
+                let page = history.get_queue(session, puuid, 0, RANKED_GAMES, Some(queue));
+                match page.await {
+                    Ok(page) => games.extend(page.games),
+                    Err(err) => log::debug!("ranked history for queue {queue} failed: {err}"),
+                }
+            }
+        }
+        games.retain(|g| RANKED_QUEUES.contains(&g.queue_id));
+        games.sort_by_key(|g| std::cmp::Reverse(g.created_at));
+        games.dedup_by_key(|g| g.game_id);
+        games.truncate(RANKED_GAMES as usize);
+        (puuid.to_owned(), games)
+    });
+    let results = futures_util::future::join_all(requests).await;
+    results.into_iter().collect()
+}
+
+/// Profiles judged in the context of this game, with the power index's ranked form
+/// taken from the ranked games.
+fn profiles(
+    roster: &Roster,
+    pages: &[MatchHistoryPage],
+    ranked: &HashMap<String, Vec<GameSummary>>,
+) -> HashMap<String, PlayerProfile> {
     let mut out = HashMap::new();
     for player in roster.allies.iter().chain(&roster.enemies) {
         let Some(page) = pages.iter().find(|p| p.puuid == player.puuid) else {
@@ -93,8 +136,15 @@ fn profiles(roster: &Roster, pages: &[MatchHistoryPage]) -> HashMap<String, Play
             champion_id: player.champion_id,
             queue_id: roster.queue_id,
             position: player.position.clone(),
+            // Only the power index reads these profiles, and it ignores the champion.
+            champion_points: None,
         };
-        out.insert(player.puuid.clone(), player_profile::build(page, &ctx));
+        let mut profile = player_profile::build(page, &ctx);
+        if let Some(games) = ranked.get(&player.puuid) {
+            let games: Vec<&GameSummary> = games.iter().collect();
+            profile.form = player_profile::ranked_form(&games, &player.position);
+        }
+        out.insert(player.puuid.clone(), profile);
     }
     out
 }
@@ -104,24 +154,20 @@ fn profiles(roster: &Roster, pages: &[MatchHistoryPage]) -> HashMap<String, Play
 async fn early_stats(
     state: &AppState,
     session: &LcuSession,
-    roster: &Roster,
-    pages: &[MatchHistoryPage],
+    ranked: &HashMap<String, Vec<GameSummary>>,
 ) -> HashMap<String, EarlyStats> {
     if session.sgp.is_none() {
         return HashMap::new();
     }
     let mut wanted: HashMap<String, Vec<&GameSummary>> = HashMap::new();
     let mut unique: HashMap<i64, &GameSummary> = HashMap::new();
-    for puuid in roster.puuids() {
-        let Some(page) = pages.iter().find(|p| p.puuid == puuid) else {
-            continue;
-        };
-        let ranked = page.games.iter().filter(|g| has_timeline(g));
-        let games: Vec<&GameSummary> = ranked.take(TIMELINE_GAMES).collect();
+    for (puuid, games) in ranked {
+        let with_timeline = games.iter().filter(|g| has_timeline(g));
+        let games: Vec<&GameSummary> = with_timeline.take(TIMELINE_GAMES).collect();
         for game in &games {
             unique.entry(game.game_id).or_insert(*game);
         }
-        wanted.insert(puuid.to_owned(), games);
+        wanted.insert(puuid.clone(), games);
     }
 
     let timelines = &state.timelines;
@@ -164,5 +210,5 @@ async fn early_stats(
 /// Finished ranked games that list their participants (SGP pages only).
 fn has_timeline(game: &GameSummary) -> bool {
     let finished = matches!(game.result, GameResult::Win | GameResult::Loss);
-    finished && TIMELINE_QUEUES.contains(&game.queue_id) && !game.participants.is_empty()
+    finished && RANKED_QUEUES.contains(&game.queue_id) && !game.participants.is_empty()
 }

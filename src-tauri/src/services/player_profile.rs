@@ -33,6 +33,10 @@ mod limits {
     pub const ELITE_MIN_GAMES: usize = 8;
     pub const PRACTICE_MIN_SAMPLE: usize = 8;
     pub const PRACTICE_MAX_GAMES: usize = 2;
+    /// Lumina: mastery points below this back up 练英雄, at or above the next one the
+    /// player is an old hand on the champion who just has not played it lately.
+    pub const PRACTICE_MAX_POINTS: i64 = 20_000;
+    pub const VETERAN_POINTS: i64 = 100_000;
     /// Lumina: a champion used in this share of recent Rift games is a signature pick.
     pub const SIGNATURE_MIN_GAMES: usize = 5;
     pub const SIGNATURE_SHARE: f64 = 0.4;
@@ -74,7 +78,7 @@ const ENTERTAINMENT_MODES: [&str; 7] = [
 ];
 const FLASH: i64 = 4;
 const AKARI_NOTE: &str = "综合 KDA、胜率、伤害、承伤、治疗、补刀、经济、参团与视野。";
-const PRACTICE_NOTE: &str = "可能仍在练习；样本不代表生涯总场数。";
+const PRACTICE_NOTE: &str = "拿不到英雄成就点，分不清是在练还是以前常玩、最近没碰。";
 const BOOSTING_NOTE: &str = "这只是基于近期表现和操作习惯的提示，不代表换人或代练的事实。";
 
 /// What the player is doing right now, as far as the roster knows.
@@ -85,6 +89,8 @@ pub struct ProfileContext {
     /// 0 when unknown.
     pub queue_id: i64,
     pub position: String,
+    /// Mastery points on `champion_id`; `None` when unknown.
+    pub champion_points: Option<i64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -156,6 +162,13 @@ pub struct RankedForm {
     pub wins: f64,
     /// -1..1 against the average player on the same position; `None` without SGP data.
     pub performance: Option<f64>,
+    /// Games whose position is known, how many were on the most played position, and how
+    /// many on `role`, the position in this game (empty when unknown).
+    pub positioned_games: usize,
+    pub main_position: String,
+    pub main_games: usize,
+    pub role: String,
+    pub role_games: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -384,14 +397,7 @@ impl Facts<'_> {
         }
 
         if n >= limits::PRACTICE_MIN_SAMPLE && k <= limits::PRACTICE_MAX_GAMES {
-            return Some(tag(
-                "champion-practice",
-                "练英雄".to_owned(),
-                Tone::Warning,
-                format!("最近 {n} 场召唤师峡谷对局中，当前英雄只用过 {k} 场，{PRACTICE_NOTE}"),
-                false,
-                65,
-            ));
+            return self.rarely_played(n, k);
         }
         if k >= limits::SIGNATURE_MIN_GAMES && ratio(k, n) >= limits::SIGNATURE_SHARE {
             let losses = k - wins;
@@ -403,6 +409,31 @@ impl Facts<'_> {
                 false,
                 65,
             ));
+        }
+        None
+    }
+
+    /// Few recent games on the champion: still practising, or an old hand back after a
+    /// break? Mastery points decide; without them the tag only reports the recent games.
+    fn rarely_played(&self, n: usize, k: usize) -> Option<PlayerTag> {
+        let recent = format!("最近 {n} 场召唤师峡谷对局中，当前英雄只用过 {k} 场");
+        let Some(points) = self.ctx.champion_points else {
+            let detail = format!("{recent}。{PRACTICE_NOTE}");
+            let label = "近期少玩".to_owned();
+            let rare = tag("champion-rare", label, Tone::Warning, detail, true, 55);
+            return Some(rare);
+        };
+        if points >= limits::VETERAN_POINTS {
+            let label = format!("熟练 {}万", points / 10_000);
+            let detail = format!("{recent}，但英雄成就点 {points}，以前常玩，只是最近少碰。");
+            let veteran = tag("champion-veteran", label, Tone::Positive, detail, false, 60);
+            return Some(veteran);
+        }
+        if points < limits::PRACTICE_MAX_POINTS {
+            let detail = format!("{recent}，英雄成就点只有 {points}，很可能还在练。");
+            let label = "练英雄".to_owned();
+            let practice = tag("champion-practice", label, Tone::Warning, detail, false, 65);
+            return Some(practice);
         }
         None
     }
@@ -675,26 +706,36 @@ fn akari_score(
     })
 }
 
-fn ranked_form(counted: &[&GameSummary], position: &str) -> Option<RankedForm> {
+/// `games` newest first; games that are not ranked or were remade are skipped.
+/// `position` is the one in the current game, empty when unknown.
+pub fn ranked_form(games: &[&GameSummary], position: &str) -> Option<RankedForm> {
     let mut ranked = Vec::new();
-    for game in counted {
-        if is_ranked(game) {
+    for game in games {
+        if counts(game) && is_ranked(game) {
             ranked.push(*game);
         }
     }
     if ranked.is_empty() {
         return None;
     }
-    let role = match position {
-        "" => main_position(&ranked),
-        _ => position.to_owned(),
-    };
+    let main = main_position(&ranked);
+    let on = |p: &str| ranked.iter().filter(|g| g.position == p).count();
     let mut form = RankedForm {
         games: ranked.len(),
         off_role_games: 0,
         weight: 0.0,
         wins: 0.0,
         performance: None,
+        positioned_games: ranked.len() - on(""),
+        main_games: on(&main),
+        role_games: on(position),
+        main_position: main,
+        role: position.to_owned(),
+    };
+    // Off-role means away from this game's position, else from the usual one.
+    let role = match position {
+        "" => form.main_position.clone(),
+        _ => position.to_owned(),
     };
     let (mut rated, mut performance) = (0.0, 0.0);
     for (i, game) in ranked.iter().enumerate() {
@@ -1025,6 +1066,18 @@ mod tests {
     }
 
     #[test]
+    fn ranked_form_counts_positions() {
+        let mut games = many(6, 420, GameResult::Win, [5, 2, 5]);
+        games[0].position = "JUNGLE".to_owned();
+        games[1].position = String::new();
+        let refs: Vec<&GameSummary> = games.iter().collect();
+        let form = ranked_form(&refs, "JUNGLE").unwrap();
+        assert_eq!(form.positioned_games, 5);
+        assert_eq!(form.main_position, "MIDDLE");
+        assert_eq!((form.main_games, form.role_games), (4, 1));
+    }
+
+    #[test]
     fn ranked_form_skips_other_queues_and_discounts_off_role_games() {
         let mut games = many(5, 450, GameResult::Loss, [0, 10, 0]);
         games.extend(many(3, 420, GameResult::Loss, [0, 10, 0]));
@@ -1045,12 +1098,18 @@ mod tests {
     #[test]
     fn champion_practice_and_signature() {
         let games = many(10, 420, GameResult::Win, [5, 2, 5]);
-        let practice = ProfileContext {
+        let rarely = |points: Option<i64>| ProfileContext {
             champion_id: 99,
+            champion_points: points,
             ..ProfileContext::default()
         };
-        let profile = build(&page(games.clone()), &practice);
+        let profile = build(&page(games.clone()), &rarely(Some(5_000)));
         assert!(has(&profile, "champion-practice"));
+        let profile = build(&page(games.clone()), &rarely(Some(300_000)));
+        assert!(has(&profile, "champion-veteran"));
+        assert!(!has(&profile, "champion-practice"));
+        let profile = build(&page(games.clone()), &rarely(None));
+        assert!(has(&profile, "champion-rare"));
         let main = ProfileContext {
             champion_id: 1,
             ..ProfileContext::default()

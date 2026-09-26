@@ -90,10 +90,16 @@ pub async fn player_profile(
     position: String,
 ) -> Result<PlayerProfile> {
     let session = state.session()?;
+    let mut champion_points = None;
+    if champion_id > 0 {
+        let points = services::champion_mastery::points(&session, &puuid, champion_id);
+        champion_points = points.await;
+    }
     let ctx = ProfileContext {
         champion_id,
         queue_id,
         position,
+        champion_points,
     };
     services::player_profile::load(&state.match_history, &session, &puuid, &ctx).await
 }

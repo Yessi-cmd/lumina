@@ -3,10 +3,11 @@
 //! Every identified player gets a power index (0–100, 50 = average) from solo/duo and flex
 //! games only, recent games and games on the current position weighted most: win rate
 //! shrunk towards 50% for small samples, performance against the average player on the
-//! same position, and gold against the lane opponent at 10 minutes. Players are then
-//! ranked within their own team (上等马 / 下等马), opponents are called out as 硬骨头 /
-//! 软柿子, same-position players are compared lane by lane, and early deaths to the enemy
-//! jungler mark players as easy or hard to gank.
+//! same position, gold against the lane opponent at 10 minutes, and whether they play
+//! their usual position (补位 costs power). Players are then ranked within their own team
+//! (上等马 / 下等马), opponents are called out as 硬骨头 / 软柿子, same-position players
+//! are compared lane by lane, and early deaths to the enemy jungler mark players as easy
+//! or hard to gank.
 
 use std::collections::HashMap;
 
@@ -29,6 +30,16 @@ mod limits {
     /// Gold at 10 minutes per power point, and the most it can add or remove.
     pub const LANE_GOLD_PER_POINT: f64 = 40.0;
     pub const LANE_CAP: f64 = 12.0;
+    /// Share of ranked games on this game's position that neither adds nor removes power,
+    /// power per unit of share, and the bounds: 补位 costs more than 本位置 earns.
+    pub const POSITION_MIN_GAMES: usize = 5;
+    pub const POSITION_PIVOT: f64 = 0.3;
+    pub const POSITION_WEIGHT: f64 = 20.0;
+    pub const POSITION_MAX: f64 = 5.0;
+    pub const POSITION_MIN: f64 = -6.0;
+    /// Below this share of enough ranked games the player is called 补位.
+    pub const OFF_ROLE_SHARE: f64 = 0.15;
+    pub const OFF_ROLE_MIN_GAMES: usize = 8;
     pub const LANE_MIN_GAMES: usize = 3;
     /// Distance from the team median before someone is called 上等马 / 下等马.
     pub const TIER_GAP: f64 = 6.0;
@@ -98,6 +109,7 @@ struct Seat<'a> {
     ally: bool,
     position: String,
     power: Option<f64>,
+    form: Option<&'a RankedForm>,
     early: Option<&'a EarlyStats>,
 }
 
@@ -133,13 +145,16 @@ pub fn analyze(
                 ally,
                 position,
                 power,
+                form: profile.and_then(|p| p.form.as_ref()),
                 early: stats,
             });
         }
     }
 
     for seat in &seats {
-        for tag in gank_and_lane_tags(seat) {
+        let mut tags = gank_and_lane_tags(seat);
+        tags.extend(position_tag(seat));
+        for tag in tags {
             matchup.add_tag(&seat.player.puuid, tag);
         }
     }
@@ -302,12 +317,13 @@ fn power_index(profile: &PlayerProfile, early: Option<&EarlyStats>) -> Option<f6
     if form.games < limits::POWER_MIN_GAMES {
         return None;
     }
-    let (win, performance, lane) = power_parts(form, early);
-    Some((50.0 + win + performance + lane).clamp(0.0, 100.0))
+    let (win, performance, lane, position) = power_parts(form, early);
+    Some((50.0 + win + performance + lane + position).clamp(0.0, 100.0))
 }
 
-/// Contributions of ranked win rate, ranked performance and laning to the power index.
-fn power_parts(form: &RankedForm, early: Option<&EarlyStats>) -> (f64, f64, f64) {
+/// Contributions of ranked win rate, ranked performance, laning and position to the
+/// power index.
+fn power_parts(form: &RankedForm, early: Option<&EarlyStats>) -> (f64, f64, f64, f64) {
     let prior = limits::WIN_RATE_PRIOR_GAMES;
     let shrunk = (form.wins + prior / 2.0) / (form.weight + prior);
     let win = (shrunk - 0.5) * limits::WIN_RATE_WEIGHT;
@@ -321,7 +337,21 @@ fn power_parts(form: &RankedForm, early: Option<&EarlyStats>) -> (f64, f64, f64)
         let raw = e.avg_gold_diff_10 / limits::LANE_GOLD_PER_POINT;
         lane = raw.clamp(-limits::LANE_CAP, limits::LANE_CAP);
     }
-    (win, performance, lane)
+
+    let position = position_share(form).map_or(0.0, |share| {
+        let raw = (share - limits::POSITION_PIVOT) * limits::POSITION_WEIGHT;
+        raw.clamp(limits::POSITION_MIN, limits::POSITION_MAX)
+    });
+    (win, performance, lane, position)
+}
+
+/// Share of the player's ranked games on this game's position; `None` when the position
+/// is unknown or too few games say where they were played.
+fn position_share(form: &RankedForm) -> Option<f64> {
+    if form.role.is_empty() || form.positioned_games < limits::POSITION_MIN_GAMES {
+        return None;
+    }
+    Some(form.role_games as f64 / form.positioned_games as f64)
 }
 
 fn lane_sample(early: Option<&EarlyStats>) -> Option<&EarlyStats> {
@@ -332,7 +362,7 @@ fn breakdown(profile: &PlayerProfile, early: Option<&EarlyStats>, power: f64) ->
     let Some(form) = &profile.form else {
         return String::new();
     };
-    let (win, performance, lane) = power_parts(form, early);
+    let (win, performance, lane, position) = power_parts(form, early);
     let rate = (form.wins / form.weight * 100.0).round();
     let n = form.games;
     let head = format!("战力 {power:.0} = 50 + 胜率 {win:+.0}");
@@ -343,6 +373,12 @@ fn breakdown(profile: &PlayerProfile, early: Option<&EarlyStats>, power: f64) ->
     if let Some(e) = lane_sample(early) {
         let gold = e.avg_gold_diff_10;
         text.push_str(&format!(" + 对线 {lane:+.0}（10 分钟经济差 {gold:+.0}）"));
+    }
+    if position_share(form).is_some() {
+        let (games, on) = (form.positioned_games, form.role_games);
+        let role = position_name(&form.role);
+        let share = format!("本局{role}，近 {games} 场排位打了 {on} 场");
+        text.push_str(&format!(" + 位置 {position:+.0}（{share}）"));
     }
     if form.off_role_games > 0 {
         let off = form.off_role_games;
@@ -393,6 +429,30 @@ fn gank_and_lane_tags(seat: &Seat) -> Vec<PlayerTag> {
         }
     }
     tags
+}
+
+/// 补位: this game's position is one the player rarely plays in ranked.
+fn position_tag(seat: &Seat) -> Option<PlayerTag> {
+    let form = seat.form?;
+    let share = position_share(form)?;
+    if share >= limits::OFF_ROLE_SHARE || form.positioned_games < limits::OFF_ROLE_MIN_GAMES {
+        return None;
+    }
+    let tone = if seat.ally {
+        Tone::Warning
+    } else {
+        Tone::Positive
+    };
+    let (n, k) = (form.positioned_games, form.role_games);
+    let role = position_name(&form.role);
+    let mut detail = format!("近 {n} 场排位只打过 {k} 场{role}");
+    let main = position_name(&form.main_position);
+    if !main.is_empty() && form.main_position != form.role {
+        let m = form.main_games;
+        detail.push_str(&format!("，常玩{main}（{m} 场）"));
+    }
+    detail.push('。');
+    Some(tag("off-role", "补位", tone, detail, 80))
 }
 
 fn tag(id: &'static str, label: &str, tone: Tone, detail: String, priority: u8) -> PlayerTag {
@@ -448,6 +508,11 @@ mod tests {
                 weight: games as f64,
                 wins: wins as f64,
                 performance: None,
+                positioned_games: 0,
+                main_position: String::new(),
+                main_games: 0,
+                role: String::new(),
+                role_games: 0,
             }),
         }
     }
@@ -511,6 +576,23 @@ mod tests {
         let titles: Vec<&str> = m.advice.iter().map(|a| a.title.as_str()).collect();
         assert!(titles.contains(&"敌方软柿子"));
         assert!(titles.iter().any(|t| t.starts_with("优势路")));
+    }
+
+    #[test]
+    fn off_role_players_lose_power_and_get_tagged() {
+        let (roster, mut profiles) = game();
+        let mut p = profile(10, 20);
+        if let Some(form) = p.form.as_mut() {
+            form.positioned_games = 20;
+            form.main_position = "MIDDLE".to_owned();
+            form.main_games = 19;
+            form.role = "JUNGLE".to_owned();
+            form.role_games = 1;
+        }
+        profiles.insert("e-JUNGLE".to_owned(), p);
+        let m = analyze(&roster, &profiles, &HashMap::new());
+        assert!(m.powers["e-JUNGLE"].power < 46.0);
+        assert_eq!(tone_of(&m, "e-JUNGLE", "off-role"), Tone::Positive);
     }
 
     #[test]
