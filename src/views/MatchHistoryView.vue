@@ -2,6 +2,7 @@
 import { computed, ref, shallowRef, watch } from "vue";
 import { useRoute } from "vue-router";
 import { api, PANEL_HISTORY_COUNT, type DataSource, type GameSummary, type Summoner } from "../api";
+import CareerPanel from "../components/career/CareerPanel.vue";
 import AppIcon from "../components/common/AppIcon.vue";
 import MatchRow from "../components/match/MatchRow.vue";
 import { profileIconUrl, useGameDataStore } from "../stores/gameData";
@@ -25,6 +26,8 @@ const lcu = useLcuStore();
 const gd = useGameDataStore();
 const route = useRoute();
 
+/** Game list or career analysis of the shown player. */
+const view = ref<"games" | "career">("games");
 const queueFilter = ref<number | null>(null);
 const championFilter = ref<number | null>(null);
 
@@ -245,6 +248,18 @@ watch(
       </div>
     </div>
 
+    <div v-if="summoner" class="segmented self-start">
+      <button class="segment px-4 py-1.5 text-sm" :class="view === 'games' && 'segment-active'" @click="view = 'games'">
+        对局记录
+      </button>
+      <button class="segment px-4 py-1.5 text-sm" :class="view === 'career' && 'segment-active'" @click="view = 'career'">
+        生涯分析
+      </button>
+    </div>
+
+    <Transition name="fade" mode="out-in">
+    <CareerPanel v-if="summoner && view === 'career'" :key="summoner.puuid" :puuid="summoner.puuid" />
+    <div v-else class="flex flex-col gap-4">
     <div v-if="summoner" class="flex flex-wrap items-center gap-2">
       <AppIcon name="filter" :size="15" class="text-zinc-500" />
       <select v-model="queueFilter" class="field py-1" @change="onQueueChange">
@@ -295,5 +310,7 @@ watch(
     >
       {{ loading ? "加载中…" : "加载更多" }}
     </button>
+    </div>
+    </Transition>
   </section>
 </template>

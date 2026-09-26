@@ -165,6 +165,11 @@ body {
     @apply relative transition-transform duration-200 ease-out-expo hover:z-10 hover:scale-115;
   }
 
+  /* The best value of a column in a game table. */
+  .best-value {
+    @apply rounded bg-amber-400/15 font-semibold text-amber-300;
+  }
+
   /* Placeholder while data loads. */
   .skeleton {
     @apply animate-shimmer rounded-md bg-[length:200%_100%];

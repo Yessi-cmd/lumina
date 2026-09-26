@@ -252,7 +252,7 @@ async function apply() {
               v-for="(perk, i) in variant.runes.perks"
               :key="i"
               :src="gd.perkIcon(perk)"
-              :title="gd.perkName(perk)"
+              v-tip="gd.perkTip(perk)"
               class="rounded-full bg-zinc-800"
               :class="i === 0 ? 'size-7' : i < 6 ? 'size-5' : 'size-4'"
             />
@@ -323,7 +323,7 @@ async function apply() {
             <img :src="gd.championIcon(opponentId)" class="size-8 rounded bg-zinc-800" />
             <div class="min-w-0">
               <div class="text-sm">{{ gd.championName(opponentId) }}</div>
-              <div v-if="opponentMatchup" :title="matchupTitle(opponentMatchup)">
+              <div v-if="opponentMatchup" v-tip="matchupTitle(opponentMatchup)">
                 <span class="font-medium" :class="VERDICT[opponentMatchup.verdict].class">
                   {{ VERDICT[opponentMatchup.verdict].label }}
                 </span>
@@ -368,7 +368,7 @@ async function apply() {
               m.championId === opponentId && 'bg-zinc-800',
               m.usualPosition !== lane && 'opacity-60',
             ]"
-            :title="matchupTitle(m)"
+            v-tip="matchupTitle(m)"
             @click="pinOpponent(m.championId)"
           >
             <img :src="gd.championIcon(m.championId)" class="size-6 rounded bg-zinc-800" />
@@ -390,7 +390,7 @@ async function apply() {
               v-for="m in matchups.best"
               :key="m.championId"
               :src="gd.championIcon(m.championId)"
-              :title="matchupTitle(m)"
+              v-tip="matchupTitle(m)"
               class="size-6 rounded ring-1 ring-emerald-600/60"
             />
             <span v-if="!matchups.best.length" class="text-zinc-500">没有明显克制的对位</span>
@@ -401,7 +401,7 @@ async function apply() {
               v-for="m in matchups.worst"
               :key="m.championId"
               :src="gd.championIcon(m.championId)"
-              :title="matchupTitle(m)"
+              v-tip="matchupTitle(m)"
               class="size-6 rounded ring-1 ring-red-600/60"
             />
             <span v-if="!matchups.worst.length" class="text-zinc-500">没有明显被克制的对位</span>

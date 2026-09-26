@@ -129,7 +129,7 @@ function openHistory() {
       <img
         v-if="player.championId > 0"
         :src="gd.championIcon(player.championId)"
-        :title="gd.championName(player.championId)"
+        v-tip="gd.championName(player.championId)"
         class="size-11 rounded-lg bg-zinc-800 ring-1 ring-white/10"
       />
       <div v-else class="size-11 rounded-lg bg-zinc-800 ring-1 ring-white/10" />
@@ -151,7 +151,7 @@ function openHistory() {
           v-if="power"
           class="ml-auto shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ring-1 ring-inset"
           :class="powerClass"
-          :title="power.breakdown"
+          v-tip="{ title: `战力 ${Math.round(power.power)}`, body: power.breakdown }"
         >
           战力 {{ Math.round(power.power) }}
         </span>
@@ -162,18 +162,21 @@ function openHistory() {
         <span
           v-if="hiddenTags.length"
           class="rounded-md bg-white/5 px-1.5 py-[3px] text-[11px] leading-none text-zinc-400 ring-1 ring-white/10 ring-inset"
-          :title="hiddenTags.map((t) => `${t.label}：${t.detail}`).join('\n')"
+          v-tip="{
+            title: `另外 ${hiddenTags.length} 个标签`,
+            body: hiddenTags.map((t) => `${t.label}：${t.detail}`).join('\n\n'),
+          }"
         >
           +{{ hiddenTags.length }}
         </span>
       </div>
 
-      <p v-if="error" class="mt-1 truncate text-xs text-red-400" :title="error">{{ error }}</p>
+      <p v-if="error" class="mt-1 truncate text-xs text-red-400" v-tip="error">{{ error }}</p>
       <p v-else-if="!profile" class="mt-1 text-xs text-zinc-500">加载战绩…</p>
       <p v-else-if="profile.sampleGames === 0" class="mt-1 text-xs text-zinc-500">近期没有对局</p>
       <template v-else>
         <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
-          <span :class="winRateClass" :title="`样本：近期${SCOPES[profile.scope]}对局`">
+          <span :class="winRateClass" v-tip="`样本：近期${SCOPES[profile.scope]}对局`">
             胜率 {{ percent(profile.winRate) }}
             <span class="text-zinc-500">
               ({{ profile.wins }}/{{ profile.sampleGames }} {{ SCOPES[profile.scope] }})
@@ -186,7 +189,7 @@ function openHistory() {
           <span
             v-if="profile.akariScore"
             class="text-zinc-400"
-            :title="`Akari Score，基于 ${profile.akariScore.games} 场完整数据`"
+            v-tip="`Akari Score，基于 ${profile.akariScore.games} 场完整数据`"
           >
             评分 {{ profile.akariScore.total.toFixed(1) }}
           </span>
@@ -211,7 +214,7 @@ function openHistory() {
               v-for="c in profile.topChampions"
               :key="c.championId"
               :src="gd.championIcon(c.championId)"
-              :title="`${gd.championName(c.championId)} ${c.wins}胜${c.games - c.wins}负`"
+              v-tip="`${gd.championName(c.championId)} ${c.wins}胜${c.games - c.wins}负`"
               class="size-5 rounded-md bg-zinc-800 ring-1 ring-white/10"
             />
           </div>
