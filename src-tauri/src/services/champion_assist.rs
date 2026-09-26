@@ -210,8 +210,8 @@ async fn apply_runes(session: &LcuSession, title: &str, page: &RunePage) -> Resu
 async fn apply_spells(session: &LcuSession, first: i64, second: i64) -> Result<()> {
     let http = &session.http;
     let champ_select: ChampSelectSession = http.get(CHAMP_SELECT).await?;
-    let me = champ_select.my_team.iter();
-    let me = me.find(|m| m.cell_id == champ_select.local_player_cell_id);
+    let mut team = champ_select.my_team.iter();
+    let me = team.find(|m| m.cell_id == champ_select.local_player_cell_id);
     let flash_on_f = me.is_some_and(|m| m.spell2_id == FLASH);
     let (d, f) = order_spells(first, second, flash_on_f);
     let body = json!({ "spell1Id": d, "spell2Id": f });
