@@ -1,13 +1,11 @@
 //! Locates a running League client and extracts its LCU credentials.
 //!
 //! Primary source is the `LeagueClientUx.exe` command line. When the client runs
-//! elevated (typical for the Tencent client) neither its command line nor its path can be
-//! read from a normal process, so we fall back to the `lockfile` next to the executable:
-//! found through the process when possible, otherwise in directories remembered from an
-//! earlier (elevated) connection.
+//! elevated (typical for the Tencent client) the command line cannot be read from a
+//! normal process, so we fall back to the `lockfile` next to the executable.
 
 use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde::Serialize;
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
@@ -29,9 +27,6 @@ pub struct Credentials {
     pub auth_token: String,
     pub platform_id: Option<String>,
     pub source: CredentialSource,
-    /// Directory of the client executables, when it could be seen; remembered so the
-    /// lockfile can be found without admin rights next time.
-    pub client_dir: Option<PathBuf>,
 }
 
 impl std::fmt::Debug for Credentials {
@@ -42,7 +37,6 @@ impl std::fmt::Debug for Credentials {
             .field("auth_token", &"<redacted>")
             .field("platform_id", &self.platform_id)
             .field("source", &self.source)
-            .field("client_dir", &self.client_dir)
             .finish()
     }
 }
@@ -55,8 +49,7 @@ pub enum Discovery {
 }
 
 /// Blocking: enumerates processes. Call from `spawn_blocking`.
-/// `known_dirs` are client directories remembered from earlier connections.
-pub fn discover(known_dirs: &[PathBuf]) -> Discovery {
+pub fn discover() -> Discovery {
     let mut sys = System::new();
     let names_only = ProcessRefreshKind::nothing();
     sys.refresh_processes_specifics(ProcessesToUpdate::All, true, names_only);
@@ -80,9 +73,7 @@ pub fn discover(known_dirs: &[PathBuf]) -> Discovery {
         let Some(process) = sys.process(*pid) else {
             continue;
         };
-        if let Some(mut creds) = parse_command_line(process.cmd()) {
-            let exe = process.exe();
-            creds.client_dir = exe.and_then(Path::parent).map(Path::to_path_buf);
+        if let Some(creds) = parse_command_line(process.cmd()) {
             return Discovery::Found(creds);
         }
     }
@@ -92,19 +83,7 @@ pub fn discover(known_dirs: &[PathBuf]) -> Discovery {
         let Some(dir) = exe.and_then(Path::parent) else {
             continue;
         };
-        if let Some(mut creds) = read_lockfile(&dir.join("lockfile")) {
-            creds.client_dir = Some(dir.to_path_buf());
-            return Discovery::Found(creds);
-        }
-    }
-
-    // The lockfile outlives a crashed client, so only trust one whose pid is running.
-    for dir in known_dirs {
-        let Some(mut creds) = read_lockfile(&dir.join("lockfile")) else {
-            continue;
-        };
-        if targets.contains(&Pid::from_u32(creds.pid)) {
-            creds.client_dir = Some(dir.clone());
+        if let Some(creds) = read_lockfile(&dir.join("lockfile")) {
             return Discovery::Found(creds);
         }
     }
@@ -149,7 +128,6 @@ fn parse_command_line<S: AsRef<OsStr>>(args: &[S]) -> Option<Credentials> {
         auth_token: auth_token.filter(|t| !t.is_empty())?,
         platform_id: platform_id.filter(|p| !p.is_empty()),
         source: CredentialSource::CommandLine,
-        client_dir: None,
     })
 }
 
@@ -174,7 +152,6 @@ fn parse_lockfile(content: &str) -> Option<Credentials> {
         auth_token,
         platform_id: None,
         source: CredentialSource::Lockfile,
-        client_dir: None,
     })
 }
 

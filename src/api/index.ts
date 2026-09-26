@@ -372,8 +372,6 @@ export interface Settings {
   statsTier: string;
   /** Rank filter for matchups: emerald_plus / diamond_plus / master_plus. */
   matchupTier: string;
-  /** Folder of LeagueClientUx.exe, remembered so no admin rights are needed; "" when unknown. */
-  clientDir: string;
 }
 
 export interface PendingAccept {

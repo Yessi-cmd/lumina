@@ -28,9 +28,6 @@ pub struct Settings {
     pub stats_tier: String,
     /// Rank filter for matchups (counters), one of `MATCHUP_TIERS`.
     pub matchup_tier: String,
-    /// Directory holding `LeagueClientUx.exe` and its lockfile; learned from an elevated
-    /// connection (or typed in) so later launches need no admin rights. Empty when unknown.
-    pub client_dir: String,
 }
 
 impl Default for Settings {
@@ -41,7 +38,6 @@ impl Default for Settings {
             auto_show_panel: true,
             stats_tier: DEFAULT_STATS_TIER.to_owned(),
             matchup_tier: DEFAULT_MATCHUP_TIER.to_owned(),
-            client_dir: String::new(),
         }
     }
 }
@@ -85,7 +81,6 @@ impl Settings {
         if !MATCHUP_TIERS.contains(&self.matchup_tier.as_str()) {
             self.matchup_tier = DEFAULT_MATCHUP_TIER.to_owned();
         }
-        self.client_dir = self.client_dir.trim().to_owned();
         self
     }
 }

@@ -115,20 +115,6 @@ function onDelayInput(event: Event) {
       <p v-if="store.saveError" class="mt-3 text-sm text-red-400">{{ store.saveError }}</p>
     </div>
 
-    <div v-if="s" class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-      <div class="font-medium">客户端目录</div>
-      <div class="text-sm text-zinc-400">
-        以管理员身份连接过一次后会自动记住，之后普通启动即可连接（国服客户端以管理员运行时需要）。
-        也可以手动填写 LeagueClientUx.exe 所在的文件夹。
-      </div>
-      <input
-        :value="s.clientDir"
-        placeholder="例如 D:\WeGameApps\英雄联盟\LeagueClient"
-        class="mt-2 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-1.5 font-mono text-sm outline-none focus:border-amber-400"
-        @change="store.update({ clientDir: ($event.target as HTMLInputElement).value })"
-      />
-    </div>
-
     <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
       <div class="flex items-center justify-between gap-4">
         <div class="min-w-0">

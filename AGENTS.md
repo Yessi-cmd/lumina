@@ -19,6 +19,9 @@ Architecture and milestones: `docs/ARCHITECTURE.md`. Read it before structural c
 - Rust `commands/` are thin wrappers; logic lives in `services/`, protocol code in `clients/`.
 - Never read or write game memory or inject into game processes.
 - Do not add a heavy UI component library; build small components with Tailwind.
+- The app manifest (`src-tauri/app.manifest`) requires administrator rights, because the Tencent
+  client exposes its LCU credentials only to elevated processes. `pnpm tauri dev` therefore needs
+  an elevated terminal.
 
 ## Verification
 
