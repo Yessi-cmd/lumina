@@ -125,6 +125,8 @@ pub struct CounterRow {
     pub n: i64,
     /// Win-rate points beyond what both champions' overall win rates predict.
     pub d2: f64,
+    /// The opponent's most played lane (`top`, `jungle`, `middle`, `bottom`, `support`).
+    pub default_lane: String,
 }
 
 #[derive(Debug, Default, Deserialize)]

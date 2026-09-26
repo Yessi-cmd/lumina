@@ -156,6 +156,8 @@ export interface Matchup {
   /** Half-width of the 95% confidence interval, in points. */
   margin: number;
   verdict: Verdict;
+  /** The opponent's most played position; another lane than ours hints at a flex pick. */
+  usualPosition: string;
 }
 
 export interface MatchupReport {
@@ -163,6 +165,8 @@ export interface MatchupReport {
   againstPicks: Matchup[];
   best: Matchup[];
   worst: Matchup[];
+  /** Every opponent with data, most common first. */
+  all: Matchup[];
 }
 
 export interface ChampionBuild {

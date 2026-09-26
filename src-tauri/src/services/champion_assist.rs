@@ -114,6 +114,8 @@ pub struct Matchup {
     /// Half-width of the 95% confidence interval, in win-rate points.
     pub margin: f64,
     pub verdict: Verdict,
+    /// The opponent's most played position; another lane than ours hints at a flex pick.
+    pub usual_position: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -125,6 +127,8 @@ pub struct MatchupReport {
     /// Clearest wins and losses, strongest first.
     pub best: Vec<Matchup>,
     pub worst: Vec<Matchup>,
+    /// Every opponent with data, most common first, for choosing the opponent by hand.
+    pub all: Vec<Matchup>,
 }
 
 /// lolalytics responses cached in memory for a few hours.
@@ -217,7 +221,7 @@ impl ChampionAssist {
                 rows
             }
         };
-        Ok(report(&rows, enemies, tier))
+        Ok(report(&rows, enemies, position, tier))
     }
 
     async fn alias(&self, session: &LcuSession, champion_id: i64) -> Result<String> {
@@ -363,14 +367,19 @@ fn judge(row: CounterRow) -> Matchup {
         advantage: row.d2,
         margin,
         verdict,
+        usual_position: position_of(&row.default_lane).to_owned(),
     }
 }
 
-fn report(rows: &[Matchup], enemies: &[i64], tier: &str) -> MatchupReport {
+/// Enemy picks that usually play our lane come first; the rest may be flex picks.
+fn report(rows: &[Matchup], enemies: &[i64], position: &str, tier: &str) -> MatchupReport {
     let mut against_picks = Vec::new();
     for enemy in enemies {
         against_picks.extend(rows.iter().find(|m| m.champion_id == *enemy).cloned());
     }
+    against_picks.sort_by_key(|m| m.usual_position != position);
+    let mut all = rows.to_vec();
+    all.sort_by_key(|m| std::cmp::Reverse(m.games));
     let mut sorted: Vec<&Matchup> = rows.iter().collect();
     sorted.sort_by(|a, b| b.advantage.total_cmp(&a.advantage));
     let pick = |verdict: Verdict, items: Vec<&Matchup>| -> Vec<Matchup> {
@@ -384,6 +393,7 @@ fn report(rows: &[Matchup], enemies: &[i64], tier: &str) -> MatchupReport {
         against_picks,
         best,
         worst,
+        all,
     }
 }
 
@@ -461,6 +471,18 @@ fn skill_order(digits: &str) -> String {
     keys.join(" ")
 }
 
+/// lolalytics lane name to the LCU position name.
+fn position_of(lane: &str) -> &'static str {
+    match lane {
+        "top" => "TOP",
+        "jungle" => "JUNGLE",
+        "middle" => "MIDDLE",
+        "bottom" => "BOTTOM",
+        "support" => "UTILITY",
+        _ => "",
+    }
+}
+
 fn lane(position: &str) -> Result<&'static str> {
     match position {
         "TOP" => Ok("top"),
@@ -528,9 +550,18 @@ mod tests {
         assert_eq!(order_spells(11, 12, true), (11, 12));
     }
 
+    fn row(cid: i64, vs_wr: f64, n: i64, d2: f64) -> CounterRow {
+        CounterRow {
+            cid,
+            vs_wr,
+            n,
+            d2,
+            default_lane: "middle".to_owned(),
+        }
+    }
+
     #[test]
     fn judges_matchups_by_margin_of_error() {
-        let row = |cid, vs_wr, n, d2| CounterRow { cid, vs_wr, n, d2 };
         // 3920 games at ~48%: margin ≈ 1.6, so -1.0 is even.
         assert_eq!(judge(row(711, 48.47, 3920, -1.01)).verdict, Verdict::Even);
         assert_eq!(judge(row(81, 67.75, 803, 8.64)).verdict, Verdict::Counters);
@@ -540,17 +571,18 @@ mod tests {
 
     #[test]
     fn reports_picks_and_clearest_matchups() {
-        let row = |cid, vs_wr, n, d2| CounterRow { cid, vs_wr, n, d2 };
         let rows: Vec<Matchup> = [(1, 8.0), (2, -7.0), (3, 0.5), (4, 9.0)]
             .into_iter()
             .map(|(cid, d2)| judge(row(cid, 50.0 + d2, 5000, d2)))
             .collect();
-        let r = report(&rows, &[3, 99], "diamond_plus");
+        let r = report(&rows, &[3, 99], "MIDDLE", "diamond_plus");
         assert_eq!(r.against_picks.len(), 1);
         assert_eq!(r.against_picks[0].verdict, Verdict::Even);
         let best: Vec<i64> = r.best.iter().map(|m| m.champion_id).collect();
         assert_eq!(best, vec![4, 1]);
         assert_eq!(r.worst[0].champion_id, 2);
+        assert_eq!(r.all.len(), 4);
+        assert_eq!(r.against_picks[0].usual_position, "MIDDLE");
     }
 
     #[test]

@@ -45,6 +45,9 @@ const build = shallowRef<ChampionBuild | null>(null);
 const buildError = ref<string | null>(null);
 const variantIndex = ref(0);
 const matchups = shallowRef<MatchupReport | null>(null);
+/** Opponent chosen by hand; 0 means infer it from the enemy picks. */
+const pinnedOpponent = ref(0);
+const opponentQuery = ref("");
 const matchupError = ref<string | null>(null);
 const applying = ref(false);
 const applyMessage = ref<string | null>(null);
@@ -136,6 +139,34 @@ function matchupTitle(m: Matchup): string {
     name + "：对位胜率 " + rate + "，" + m.games + " 场。" +
     "扣除双方整体强度后优势 " + signed(m.advantage) + "，误差 ±" + m.margin.toFixed(1) + "。"
   );
+}
+
+/** An enemy pick that usually plays our lane, when there is exactly one. */
+const inferredOpponent = computed(() => {
+  const sameLane = matchups.value?.againstPicks.filter((m) => m.usualPosition === lane.value) ?? [];
+  return sameLane.length === 1 ? sameLane[0].championId : 0;
+});
+const opponentId = computed(() => pinnedOpponent.value || inferredOpponent.value);
+const opponentMatchup = computed(
+  () => matchups.value?.all.find((m) => m.championId === opponentId.value) ?? null,
+);
+const opponentResults = computed(() => {
+  const query = opponentQuery.value.trim();
+  const champions = gd.data?.champions ?? {};
+  if (!query) return [];
+  return Object.entries(champions)
+    .filter(([, c]) => c.name.includes(query) || c.alias.toLowerCase().includes(query.toLowerCase()))
+    .slice(0, 8)
+    .map(([id]) => Number(id));
+});
+
+function positionLabel(position: string): string {
+  return POSITIONS.find((p) => p.id === position)?.label ?? "未知";
+}
+
+function pinOpponent(championId: number) {
+  pinnedOpponent.value = championId;
+  opponentQuery.value = "";
 }
 
 const visible = computed(() => {
@@ -273,13 +304,72 @@ async function apply() {
       <p v-if="matchupError" class="text-red-400">{{ matchupError }}</p>
       <p v-else-if="!matchups" class="text-zinc-500">加载对位数据…</p>
       <template v-else>
+        <!-- The lane opponent: picked by hand, or the one enemy pick that usually plays this lane -->
+        <div class="mb-2 rounded border border-zinc-800 p-2">
+          <div class="flex items-center gap-2">
+            <span class="text-zinc-400">我的对位</span>
+            <span v-if="pinnedOpponent" class="text-zinc-600">手动指定</span>
+            <span v-else-if="inferredOpponent" class="text-zinc-600">按敌方已选推断</span>
+            <button
+              v-if="pinnedOpponent"
+              class="ml-auto text-zinc-500 hover:text-zinc-300"
+              @click="pinnedOpponent = 0"
+            >
+              清除
+            </button>
+          </div>
+
+          <div v-if="opponentId" class="mt-1.5 flex items-center gap-2">
+            <img :src="gd.championIcon(opponentId)" class="size-8 rounded bg-zinc-800" />
+            <div class="min-w-0">
+              <div class="text-sm">{{ gd.championName(opponentId) }}</div>
+              <div v-if="opponentMatchup" :title="matchupTitle(opponentMatchup)">
+                <span class="font-medium" :class="VERDICT[opponentMatchup.verdict].class">
+                  {{ VERDICT[opponentMatchup.verdict].label }}
+                </span>
+                <span class="ml-1.5 text-zinc-300 tabular-nums">{{ signed(opponentMatchup.advantage) }}</span>
+                <span class="ml-1 text-zinc-500">
+                  ±{{ opponentMatchup.margin.toFixed(1) }} · 对位胜率 {{ opponentMatchup.winRate.toFixed(1) }}% ·
+                  {{ opponentMatchup.games }} 场
+                </span>
+              </div>
+              <div v-else class="text-zinc-500">这个对手在{{ laneLabel }}几乎没有对位数据</div>
+            </div>
+          </div>
+          <p v-else class="mt-1 text-zinc-500">
+            点下方敌方英雄，或搜索任意英雄来指定对位（对面摇摆时手动选）。
+          </p>
+
+          <input
+            v-model="opponentQuery"
+            placeholder="搜索英雄，指定对位…"
+            class="mt-2 w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 outline-none focus:border-amber-400"
+          />
+          <div v-if="opponentResults.length" class="mt-1 flex flex-wrap gap-1">
+            <button
+              v-for="id in opponentResults"
+              :key="id"
+              class="flex items-center gap-1 rounded bg-zinc-800 px-1.5 py-0.5 hover:bg-zinc-700"
+              @click="pinOpponent(id)"
+            >
+              <img :src="gd.championIcon(id)" class="size-4 rounded" />
+              {{ gd.championName(id) }}
+            </button>
+          </div>
+        </div>
+
         <div v-if="matchups.againstPicks.length" class="mb-2 flex flex-col gap-1">
-          <div class="text-zinc-400">对上敌方已选</div>
-          <div
+          <div class="text-zinc-400">对上敌方已选（点击设为我的对位）</div>
+          <button
             v-for="m in matchups.againstPicks"
             :key="m.championId"
-            class="flex items-center gap-2"
+            class="flex items-center gap-2 rounded px-1 py-0.5 text-left hover:bg-zinc-800"
+            :class="[
+              m.championId === opponentId && 'bg-zinc-800',
+              m.usualPosition !== lane && 'opacity-60',
+            ]"
             :title="matchupTitle(m)"
+            @click="pinOpponent(m.championId)"
           >
             <img :src="gd.championIcon(m.championId)" class="size-6 rounded bg-zinc-800" />
             <span class="w-20 truncate">{{ gd.championName(m.championId) }}</span>
@@ -288,7 +378,10 @@ async function apply() {
             </span>
             <span class="text-zinc-300 tabular-nums">{{ signed(m.advantage) }}</span>
             <span class="text-zinc-500">±{{ m.margin.toFixed(1) }} · {{ m.games }} 场</span>
-          </div>
+            <span v-if="m.usualPosition !== lane" class="ml-auto text-amber-500/80">
+              常走{{ positionLabel(m.usualPosition) }}
+            </span>
+          </button>
         </div>
         <div class="grid grid-cols-[3.5rem_1fr] items-center gap-y-1.5">
           <span class="text-zinc-500">克制</span>
