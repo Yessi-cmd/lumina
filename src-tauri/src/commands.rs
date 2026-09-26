@@ -7,7 +7,7 @@ use crate::error::Result;
 use crate::logging;
 use crate::services;
 use crate::services::auto_accept::Pending;
-use crate::services::champion_assist::{BuildVariant, ChampionBuild, TierEntry};
+use crate::services::champion_assist::{BuildVariant, ChampionBuild, MatchupReport, TierEntry};
 use crate::services::game_data::GameData;
 use crate::services::game_detail::GameDetail;
 use crate::services::match_history::MatchHistoryPage;
@@ -189,4 +189,21 @@ pub async fn apply_build(
 ) -> Result<()> {
     let session = state.session()?;
     services::champion_assist::apply(&session, &title, &variant).await
+}
+
+/// Same-lane matchups of a champion from high-rank games, including against the
+/// opponents' locked picks.
+#[tauri::command]
+pub async fn champion_matchups(
+    state: State<'_, AppState>,
+    champion_id: i64,
+    position: String,
+    enemies: Vec<i64>,
+) -> Result<MatchupReport> {
+    let session = state.session()?;
+    let tier = state.settings().matchup_tier;
+    let assist = &state.champion_assist;
+    assist
+        .matchups(&session, champion_id, &position, &enemies, &tier)
+        .await
 }

@@ -88,6 +88,7 @@ function championOf(puuid: string): number {
             v-if="roster.stage === 'champSelect'"
             :position="me?.position ?? ''"
             :champion-id="me?.championId ?? 0"
+            :enemy-champions="roster.enemyChampions"
           />
           <h2 v-else class="text-sm font-medium text-red-300">敌方</h2>
           <PlayerCard

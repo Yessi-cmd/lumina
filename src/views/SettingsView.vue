@@ -94,6 +94,24 @@ function onDelayInput(event: Event) {
         </select>
       </div>
 
+      <div class="mt-4 flex items-center justify-between gap-4 border-t border-zinc-800 pt-4">
+        <div>
+          <div class="font-medium">克制关系分段</div>
+          <div class="text-sm text-zinc-400">
+            对位克制看高分段：双方都能把英雄玩到位时，对位差距才真实。样本少的对位不下结论。
+          </div>
+        </div>
+        <select
+          class="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-sm"
+          :value="s.matchupTier"
+          @change="store.update({ matchupTier: ($event.target as HTMLSelectElement).value })"
+        >
+          <option value="emerald_plus">翡翠及以上</option>
+          <option value="diamond_plus">钻石及以上</option>
+          <option value="master_plus">大师及以上</option>
+        </select>
+      </div>
+
       <p v-if="store.saveError" class="mt-3 text-sm text-red-400">{{ store.saveError }}</p>
     </div>
 

@@ -30,6 +30,8 @@ pub struct Roster {
     pub enemies: Vec<RosterPlayer>,
     /// Opponents the client does not identify; during champ select that is all of them.
     pub hidden_enemies: usize,
+    /// Champions the opponents have locked, even when their identities are hidden.
+    pub enemy_champions: Vec<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -100,6 +102,7 @@ mod tests {
             allies,
             enemies: Vec::new(),
             hidden_enemies: 0,
+            enemy_champions: Vec::new(),
         };
         let state_old = roster(vec![player("a")]);
         let state_new = roster(vec![player("a"), player("b")]);

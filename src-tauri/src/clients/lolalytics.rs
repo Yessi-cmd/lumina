@@ -38,13 +38,25 @@ impl LolalyticsClient {
         self.fetch(&params).await
     }
 
-    /// Runes, spells, skills, items and counters of one champion in one lane.
+    /// Runes, spells, skills and items of one champion in one lane.
     /// `alias` is the lowercase English name, e.g. `garen`.
     pub async fn build(&self, alias: &str, lane: &str, tier: &str) -> Result<BuildFull> {
         let params = [
             ("ep", "build-full"),
             ("c", alias),
             ("lane", lane),
+            ("tier", tier),
+        ];
+        self.fetch(&params).await
+    }
+
+    /// Same-lane matchups of one champion against every opponent.
+    pub async fn counters(&self, alias: &str, lane: &str, tier: &str) -> Result<CounterList> {
+        let params = [
+            ("ep", "counter"),
+            ("c", alias),
+            ("lane", lane),
+            ("vslane", lane),
             ("tier", tier),
         ];
         self.fetch(&params).await
@@ -99,6 +111,24 @@ pub struct TierRow {
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
+pub struct CounterList {
+    pub counters: Vec<CounterRow>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct CounterRow {
+    /// Opponent champion id.
+    pub cid: i64,
+    /// Win rate against this opponent, in percent.
+    pub vs_wr: f64,
+    pub n: i64,
+    /// Win-rate points beyond what both champions' overall win rates predict.
+    pub d2: f64,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
 pub struct BuildFull {
     pub header: BuildHeader,
     pub summary: BuildSummary,
@@ -114,15 +144,6 @@ pub struct BuildHeader {
     pub n: i64,
     pub rank: i64,
     pub rank_total: i64,
-    pub counters: Counters,
-}
-
-#[derive(Debug, Default, Deserialize)]
-#[serde(default)]
-pub struct Counters {
-    /// Champions this one does well against.
-    pub strong: Vec<i64>,
-    pub weak: Vec<i64>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -211,7 +232,6 @@ mod tests {
             "items":{"start":{"set":[1054,2003]},"core":{"set":[3006,6631,3046],"wr":55.05}}}}}"#;
         let build: BuildFull = serde_json::from_str(json).unwrap();
         assert_eq!(build.header.tier, "A");
-        assert_eq!(build.header.counters.weak, vec![10]);
         let pick = &build.summary.pick;
         assert_eq!(pick.runes.set.shards, vec![5008, 5008, 5001]);
         assert_eq!(pick.items.core.set.len(), 3);

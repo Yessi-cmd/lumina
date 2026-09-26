@@ -11,7 +11,7 @@ use serde_json::json;
 
 use super::game_data;
 use crate::clients::lcu::models::{ChampSelectSession, LcuOwnedChampion, LcuPerkPage};
-use crate::clients::lolalytics::{BuildFull, BuildSet, LolalyticsClient, TierList};
+use crate::clients::lolalytics::{BuildFull, BuildSet, CounterRow, LolalyticsClient, TierList};
 use crate::error::{AppError, Result};
 use crate::state::session::LcuSession;
 
@@ -24,6 +24,11 @@ const MY_SELECTION: &str = "/lol-champ-select/v1/session/my-selection";
 /// Rune pages Lumina created start with this, so the next apply can replace them.
 const PAGE_PREFIX: &str = "Lumina";
 const FLASH: i64 = 4;
+/// Below this many games a matchup is not judged at all.
+const MIN_MATCHUP_GAMES: i64 = 200;
+/// Two-sided 95% confidence.
+const Z_95: f64 = 1.96;
+const MATCHUP_LIST_LEN: usize = 5;
 const TIER_LABELS: [&str; 15] = [
     "S+", "S", "S-", "A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-",
 ];
@@ -55,8 +60,6 @@ pub struct ChampionBuild {
     pub pick_rate: f64,
     pub ban_rate: f64,
     pub games: i64,
-    pub strong_against: Vec<i64>,
-    pub weak_against: Vec<i64>,
     /// "最常用" then "最高胜率".
     pub variants: Vec<BuildVariant>,
 }
@@ -86,11 +89,50 @@ pub struct RunePage {
     pub perks: Vec<i64>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Verdict {
+    /// The champion wins this matchup beyond the margin of error.
+    Counters,
+    Countered,
+    /// Within the margin of error: skill decides.
+    Even,
+    TooFewGames,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Matchup {
+    /// The opponent.
+    pub champion_id: i64,
+    /// Percent.
+    pub win_rate: f64,
+    pub games: i64,
+    /// Win-rate points beyond what both champions' overall strength predicts; this is
+    /// the matchup itself, unlike the raw win rate.
+    pub advantage: f64,
+    /// Half-width of the 95% confidence interval, in win-rate points.
+    pub margin: f64,
+    pub verdict: Verdict,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MatchupReport {
+    pub tier: String,
+    /// Against the opponents' locked champions that play this lane.
+    pub against_picks: Vec<Matchup>,
+    /// Clearest wins and losses, strongest first.
+    pub best: Vec<Matchup>,
+    pub worst: Vec<Matchup>,
+}
+
 /// lolalytics responses cached in memory for a few hours.
 pub struct ChampionAssist {
     client: Option<LolalyticsClient>,
     tier_lists: Mutex<HashMap<String, (Instant, Vec<TierEntry>)>>,
     builds: Mutex<HashMap<String, (Instant, ChampionBuild)>>,
+    matchups: Mutex<HashMap<String, (Instant, Vec<Matchup>)>>,
 }
 
 impl Default for ChampionAssist {
@@ -103,6 +145,7 @@ impl Default for ChampionAssist {
             client: client.ok(),
             tier_lists: Mutex::default(),
             builds: Mutex::default(),
+            matchups: Mutex::default(),
         }
     }
 }
@@ -146,15 +189,43 @@ impl ChampionAssist {
         if let Some(build) = cached(&self.builds, &key) {
             return Ok(build);
         }
-        let data = game_data::get(session).await?;
-        let Some(champion) = data.champions.get(&champion_id) else {
-            return Err(AppError::Message(format!("未知英雄 {champion_id}")));
-        };
-        let alias = lolalytics_alias(&champion.alias);
+        let alias = self.alias(session, champion_id).await?;
         let full = self.client()?.build(&alias, lane, tier).await?;
         let build = to_build(champion_id, position, full);
         store(&self.builds, key, build.clone());
         Ok(build)
+    }
+
+    /// Same-lane matchups of one champion, judged with a confidence interval.
+    pub async fn matchups(
+        &self,
+        session: &LcuSession,
+        champion_id: i64,
+        position: &str,
+        enemies: &[i64],
+        tier: &str,
+    ) -> Result<MatchupReport> {
+        let lane = lane(position)?;
+        let key = format!("{champion_id}:{lane}:{tier}");
+        let rows = match cached(&self.matchups, &key) {
+            Some(rows) => rows,
+            None => {
+                let alias = self.alias(session, champion_id).await?;
+                let list = self.client()?.counters(&alias, lane, tier).await?;
+                let rows: Vec<Matchup> = list.counters.into_iter().map(judge).collect();
+                store(&self.matchups, key, rows.clone());
+                rows
+            }
+        };
+        Ok(report(&rows, enemies, tier))
+    }
+
+    async fn alias(&self, session: &LcuSession, champion_id: i64) -> Result<String> {
+        let data = game_data::get(session).await?;
+        let Some(champion) = data.champions.get(&champion_id) else {
+            return Err(AppError::Message(format!("未知英雄 {champion_id}")));
+        };
+        Ok(lolalytics_alias(&champion.alias))
     }
 
     fn client(&self) -> Result<&LolalyticsClient> {
@@ -268,6 +339,54 @@ fn ranked_entries(list: TierList) -> Vec<TierEntry> {
     entries
 }
 
+/// A matchup counts as a counter only when its advantage exceeds the 95% margin of error.
+fn judge(row: CounterRow) -> Matchup {
+    let p = (row.vs_wr / 100.0).clamp(0.0, 1.0);
+    let margin = if row.n > 0 {
+        Z_95 * (p * (1.0 - p) / row.n as f64).sqrt() * 100.0
+    } else {
+        100.0
+    };
+    let verdict = if row.n < MIN_MATCHUP_GAMES {
+        Verdict::TooFewGames
+    } else if row.d2 > margin {
+        Verdict::Counters
+    } else if row.d2 < -margin {
+        Verdict::Countered
+    } else {
+        Verdict::Even
+    };
+    Matchup {
+        champion_id: row.cid,
+        win_rate: row.vs_wr,
+        games: row.n,
+        advantage: row.d2,
+        margin,
+        verdict,
+    }
+}
+
+fn report(rows: &[Matchup], enemies: &[i64], tier: &str) -> MatchupReport {
+    let mut against_picks = Vec::new();
+    for enemy in enemies {
+        against_picks.extend(rows.iter().find(|m| m.champion_id == *enemy).cloned());
+    }
+    let mut sorted: Vec<&Matchup> = rows.iter().collect();
+    sorted.sort_by(|a, b| b.advantage.total_cmp(&a.advantage));
+    let pick = |verdict: Verdict, items: Vec<&Matchup>| -> Vec<Matchup> {
+        let matching = items.into_iter().filter(|m| m.verdict == verdict);
+        matching.take(MATCHUP_LIST_LEN).cloned().collect()
+    };
+    let best = pick(Verdict::Counters, sorted.clone());
+    let worst = pick(Verdict::Countered, sorted.into_iter().rev().collect());
+    MatchupReport {
+        tier: tier.to_owned(),
+        against_picks,
+        best,
+        worst,
+    }
+}
+
 fn to_build(champion_id: i64, position: &str, full: BuildFull) -> ChampionBuild {
     let header = full.header;
     let variants = vec![
@@ -284,8 +403,6 @@ fn to_build(champion_id: i64, position: &str, full: BuildFull) -> ChampionBuild 
         pick_rate: header.pr,
         ban_rate: header.br,
         games: header.n,
-        strong_against: header.counters.strong,
-        weak_against: header.counters.weak,
         variants,
     }
 }
@@ -409,6 +526,31 @@ mod tests {
         assert_eq!(order_spells(4, 14, false), (4, 14));
         assert_eq!(order_spells(14, 4, false), (4, 14));
         assert_eq!(order_spells(11, 12, true), (11, 12));
+    }
+
+    #[test]
+    fn judges_matchups_by_margin_of_error() {
+        let row = |cid, vs_wr, n, d2| CounterRow { cid, vs_wr, n, d2 };
+        // 3920 games at ~48%: margin ≈ 1.6, so -1.0 is even.
+        assert_eq!(judge(row(711, 48.47, 3920, -1.01)).verdict, Verdict::Even);
+        assert_eq!(judge(row(81, 67.75, 803, 8.64)).verdict, Verdict::Counters);
+        assert_eq!(judge(row(1, 40.0, 5000, -6.0)).verdict, Verdict::Countered);
+        assert_eq!(judge(row(2, 70.0, 116, 10.0)).verdict, Verdict::TooFewGames);
+    }
+
+    #[test]
+    fn reports_picks_and_clearest_matchups() {
+        let row = |cid, vs_wr, n, d2| CounterRow { cid, vs_wr, n, d2 };
+        let rows: Vec<Matchup> = [(1, 8.0), (2, -7.0), (3, 0.5), (4, 9.0)]
+            .into_iter()
+            .map(|(cid, d2)| judge(row(cid, 50.0 + d2, 5000, d2)))
+            .collect();
+        let r = report(&rows, &[3, 99], "diamond_plus");
+        assert_eq!(r.against_picks.len(), 1);
+        assert_eq!(r.against_picks[0].verdict, Verdict::Even);
+        let best: Vec<i64> = r.best.iter().map(|m| m.champion_id).collect();
+        assert_eq!(best, vec![4, 1]);
+        assert_eq!(r.worst[0].champion_id, 2);
     }
 
     #[test]

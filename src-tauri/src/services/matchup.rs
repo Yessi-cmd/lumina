@@ -466,6 +466,7 @@ mod tests {
             allies,
             enemies,
             hidden_enemies: 0,
+            enemy_champions: Vec::new(),
         };
         (roster, profiles)
     }

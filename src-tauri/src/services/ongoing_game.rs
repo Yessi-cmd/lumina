@@ -231,6 +231,7 @@ fn from_lobby(lobby: LobbySession, self_puuid: &str) -> Roster {
         allies,
         enemies: Vec::new(),
         hidden_enemies: 0,
+        enemy_champions: Vec::new(),
     }
 }
 
@@ -242,7 +243,11 @@ fn from_champ_select(session: ChampSelectSession) -> Roster {
     }
     let mut enemies = Vec::new();
     let mut hidden_enemies = 0;
+    let mut enemy_champions = Vec::new();
     for member in session.their_team {
+        if member.champion_id > 0 {
+            enemy_champions.push(member.champion_id);
+        }
         match champ_select_player(member, local) {
             Some(player) => enemies.push(player),
             None => hidden_enemies += 1,
@@ -255,6 +260,7 @@ fn from_champ_select(session: ChampSelectSession) -> Roster {
         allies,
         enemies,
         hidden_enemies,
+        enemy_champions,
     }
 }
 
@@ -292,7 +298,11 @@ fn from_gameflow(session: GameflowSession, self_puuid: &str) -> Option<Roster> {
         .collect();
     let mut enemies = Vec::new();
     let mut hidden_enemies = 0;
+    let mut enemy_champions = Vec::new();
     for player in theirs {
+        if player.champion_id > 0 {
+            enemy_champions.push(player.champion_id);
+        }
         match gameflow_player(player, self_puuid) {
             Some(player) => enemies.push(player),
             None => hidden_enemies += 1,
@@ -305,6 +315,7 @@ fn from_gameflow(session: GameflowSession, self_puuid: &str) -> Option<Roster> {
         allies,
         enemies,
         hidden_enemies,
+        enemy_champions,
     })
 }
 

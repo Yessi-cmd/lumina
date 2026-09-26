@@ -44,7 +44,8 @@ pub fn run() {
             commands::game_detail,
             commands::champion_tier_list,
             commands::champion_build,
-            commands::apply_build
+            commands::apply_build,
+            commands::champion_matchups
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

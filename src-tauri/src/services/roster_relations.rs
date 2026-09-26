@@ -312,6 +312,7 @@ mod tests {
             allies: ["me", "a1", "a2"].map(player).to_vec(),
             enemies: ["e1", "e2"].map(player).to_vec(),
             hidden_enemies: 0,
+            enemy_champions: Vec::new(),
         }
     }
 

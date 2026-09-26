@@ -12,6 +12,9 @@ pub const MAX_ACCEPT_DELAY_SECS: u32 = 10;
 /// lolalytics rank filters offered in settings.
 pub const STATS_TIERS: [&str; 4] = ["all", "platinum_plus", "emerald_plus", "diamond_plus"];
 const DEFAULT_STATS_TIER: &str = "emerald_plus";
+/// Matchups are judged on high-rank games, where both sides play their champions well.
+pub const MATCHUP_TIERS: [&str; 3] = ["emerald_plus", "diamond_plus", "master_plus"];
+const DEFAULT_MATCHUP_TIER: &str = "diamond_plus";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -23,6 +26,8 @@ pub struct Settings {
     pub auto_show_panel: bool,
     /// Rank filter for champion tiers and builds, one of `STATS_TIERS`.
     pub stats_tier: String,
+    /// Rank filter for matchups (counters), one of `MATCHUP_TIERS`.
+    pub matchup_tier: String,
 }
 
 impl Default for Settings {
@@ -32,6 +37,7 @@ impl Default for Settings {
             auto_accept_delay_secs: 2,
             auto_show_panel: true,
             stats_tier: DEFAULT_STATS_TIER.to_owned(),
+            matchup_tier: DEFAULT_MATCHUP_TIER.to_owned(),
         }
     }
 }
@@ -71,6 +77,9 @@ impl Settings {
         self.auto_accept_delay_secs = self.auto_accept_delay_secs.min(MAX_ACCEPT_DELAY_SECS);
         if !STATS_TIERS.contains(&self.stats_tier.as_str()) {
             self.stats_tier = DEFAULT_STATS_TIER.to_owned();
+        }
+        if !MATCHUP_TIERS.contains(&self.matchup_tier.as_str()) {
+            self.matchup_tier = DEFAULT_MATCHUP_TIER.to_owned();
         }
         self
     }

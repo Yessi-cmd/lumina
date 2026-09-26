@@ -143,6 +143,28 @@ export interface BuildVariant {
   coreItems: number[];
 }
 
+export type Verdict = "counters" | "countered" | "even" | "tooFewGames";
+
+export interface Matchup {
+  /** The opponent. */
+  championId: number;
+  /** Percent. */
+  winRate: number;
+  games: number;
+  /** Win-rate points beyond what both champions' overall strength predicts. */
+  advantage: number;
+  /** Half-width of the 95% confidence interval, in points. */
+  margin: number;
+  verdict: Verdict;
+}
+
+export interface MatchupReport {
+  tier: string;
+  againstPicks: Matchup[];
+  best: Matchup[];
+  worst: Matchup[];
+}
+
 export interface ChampionBuild {
   championId: number;
   position: string;
@@ -153,8 +175,6 @@ export interface ChampionBuild {
   pickRate: number;
   banRate: number;
   games: number;
-  strongAgainst: number[];
-  weakAgainst: number[];
   variants: BuildVariant[];
 }
 
@@ -178,6 +198,8 @@ export interface Roster {
   enemies: RosterPlayer[];
   /** Opponents the client does not identify; during champ select that is all of them. */
   hiddenEnemies: number;
+  /** Champions the opponents have locked, even when their identities are hidden. */
+  enemyChampions: number[];
 }
 
 export interface PlayerLine {
@@ -287,6 +309,8 @@ export interface Settings {
   autoShowPanel: boolean;
   /** lolalytics rank filter: all / platinum_plus / emerald_plus / diamond_plus. */
   statsTier: string;
+  /** Rank filter for matchups: emerald_plus / diamond_plus / master_plus. */
+  matchupTier: string;
 }
 
 export interface PendingAccept {
@@ -310,6 +334,8 @@ export const api = {
   championTierList: (position: string) => invoke<TierEntry[]>("champion_tier_list", { position }),
   championBuild: (championId: number, position: string) =>
     invoke<ChampionBuild>("champion_build", { championId, position }),
+  championMatchups: (championId: number, position: string, enemies: number[]) =>
+    invoke<MatchupReport>("champion_matchups", { championId, position, enemies }),
   applyBuild: (title: string, variant: BuildVariant) =>
     invoke<void>("apply_build", { title, variant }),
   ongoingRoster: () => invoke<Roster | null>("ongoing_roster"),
