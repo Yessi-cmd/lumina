@@ -221,9 +221,12 @@ async fn apply_spells(session: &LcuSession, first: i64, second: i64) -> Result<(
 
 /// Keeps Flash on F for players who already have it there.
 fn order_spells(first: i64, second: i64, flash_on_f: bool) -> (i64, i64) {
-    if flash_on_f && first == FLASH {
-        (second, first)
-    } else if !flash_on_f && second == FLASH {
+    let flash_on_wrong_key = if flash_on_f {
+        first == FLASH
+    } else {
+        second == FLASH
+    };
+    if flash_on_wrong_key {
         (second, first)
     } else {
         (first, second)
