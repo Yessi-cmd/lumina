@@ -409,7 +409,10 @@ mod tests {
         assert_eq!(roster.allies.len(), 2);
         assert_eq!(roster.allies[0].puuid, "me");
         assert!(roster.allies[0].is_self);
-        assert_eq!(roster.allies[1].puuid, "11111111-2222-3333-4444-555555555555");
+        assert_eq!(
+            roster.allies[1].puuid,
+            "11111111-2222-3333-4444-555555555555"
+        );
         assert_eq!(roster.allies[1].position, "JUNGLE");
         assert_eq!(roster.allies[1].champion_id, 64);
         assert!(!roster.allies[1].is_self);
