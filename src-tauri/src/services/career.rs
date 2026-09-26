@@ -377,9 +377,12 @@ fn trend(counted: &[&GameSummary]) -> Vec<TrendPoint> {
     points
 }
 
+/// Radar key, label and the rate it reads.
+type Axis = (&'static str, &'static str, fn(&Rates) -> f64);
+
 /// Six dimensions, each scored so that matching the reference is 50.
 fn radar(me: &Rates, reference: &Rates) -> Vec<RadarAxis> {
-    let axes: [(&'static str, &'static str, fn(&Rates) -> f64); 5] = [
+    let axes: [Axis; 5] = [
         ("damage", "输出", |r| r.damage),
         ("tanking", "承伤", |r| r.damage_taken),
         ("economy", "发育", |r| r.gold),

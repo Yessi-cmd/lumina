@@ -79,6 +79,8 @@ export interface GameSummary {
   /** Team-relative figures; only SGP lists every participant, so LCU pages have none. */
   metrics: GameMetrics | null;
   participants: { puuid: string; teamId: number; championId: number }[];
+  /** Against the other players of the game (SGP only); `opponent` is the same position. */
+  comparison: { me: Rates; peers: Rates; opponent: Rates | null } | null;
 }
 
 /** Shares are fractions of the team total (0.25 = 25%). */
@@ -115,6 +117,72 @@ export interface GameData {
   /** Runes, rune trees and stat shards. */
   perkIcons: Record<string, string>;
   perkNames: Record<string, string>;
+  /** Hover text, plain. `price` is 0 for spells. */
+  items: Record<string, Described>;
+  spells: Record<string, Described>;
+  perkDescriptions: Record<string, string>;
+}
+
+export interface Described {
+  name: string;
+  description: string;
+  price: number;
+}
+
+/** Per-minute performance; `killParticipation` is a fraction, `deaths` per 10 minutes. */
+export interface Rates {
+  damage: number;
+  damageTaken: number;
+  gold: number;
+  cs: number;
+  vision: number;
+  killParticipation: number;
+  deaths: number;
+}
+
+export type CareerRange = "recent" | "season" | "career";
+
+export interface Career {
+  games: number;
+  wins: number;
+  avgKills: number;
+  avgDeaths: number;
+  avgAssists: number;
+  avgMinutes: number;
+  firstGameAt: number;
+  lastGameAt: number;
+  truncated: boolean;
+  comparedGames: number;
+  me: Rates;
+  peers: Rates;
+  opponents: Rates | null;
+  reference: "opponent" | "peers";
+  radar: { key: string; label: string; score: number; me: number; reference: number }[];
+  champions: {
+    championId: number;
+    games: number;
+    wins: number;
+    avgKills: number;
+    avgDeaths: number;
+    avgAssists: number;
+    damage: number;
+    masteryPoints: number | null;
+  }[];
+  positions: { position: string; games: number; wins: number }[];
+  ranked: {
+    queue: "solo" | "flex";
+    tier: string;
+    division: string;
+    leaguePoints: number;
+    wins: number;
+    losses: number;
+    highestTier: string;
+    highestDivision: string;
+    previousTier: string;
+    previousDivision: string;
+  }[];
+  mastery: { championId: number; championLevel: number; championPoints: number }[];
+  trend: { result: GameResult; kda: number; createdAt: number }[];
 }
 
 export interface TierEntry {
@@ -470,6 +538,8 @@ export const api = {
   autoAcceptState: () => invoke<PendingAccept | null>("auto_accept_state"),
   cancelAutoAccept: () => invoke<void>("cancel_auto_accept"),
   draftState: () => invoke<Draft | null>("draft_state"),
+  career: (puuid: string, queue: number | null, range: CareerRange) =>
+    invoke<Career>("career", { puuid, queue, range }),
   rankedChampions: (puuid: string) => invoke<RankedChampions>("ranked_champions", { puuid }),
   logDir: () => invoke<string>("log_dir"),
   openLogDir: () => invoke<void>("open_log_dir"),

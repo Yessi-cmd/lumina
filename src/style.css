@@ -160,6 +160,11 @@ body {
     @apply text-2xl font-semibold tracking-tight text-zinc-50;
   }
 
+  /* Icons that grow slightly under the pointer. */
+  .icon-hover {
+    @apply relative transition-transform duration-200 ease-out-expo hover:z-10 hover:scale-115;
+  }
+
   /* Placeholder while data loads. */
   .skeleton {
     @apply animate-shimmer rounded-md bg-[length:200%_100%];

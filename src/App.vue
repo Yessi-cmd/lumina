@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import AppIcon, { type IconName } from "./components/common/AppIcon.vue";
 import AutoAcceptBanner from "./components/common/AutoAcceptBanner.vue";
 import TitleBar from "./components/common/TitleBar.vue";
+import TooltipLayer from "./components/common/TooltipLayer.vue";
 import { useAppStore } from "./stores/app";
 import { profileIconUrl, useGameDataStore } from "./stores/gameData";
 import { phaseLabel, useLcuStore } from "./stores/lcu";
@@ -135,5 +136,6 @@ onMounted(() => {
         </RouterView>
       </main>
     </div>
+    <TooltipLayer />
   </div>
 </template>

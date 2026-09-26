@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { shallowRef, watch } from "vue";
 import { api, assetUrl, type GameData } from "../api";
+import type { TipContent } from "../components/common/tooltip";
 import { useLcuStore } from "./lcu";
 
 /** Champion/item/spell/queue tables, loaded once per client connection. */
@@ -59,6 +60,24 @@ export const useGameDataStore = defineStore("gameData", () => {
     return data.value?.perkNames[id] ?? String(id);
   }
 
+  function itemTip(id: number): TipContent | null {
+    const item = id > 0 ? data.value?.items[id] : undefined;
+    if (!item) return null;
+    const price = item.price > 0 ? `${item.price} 金币` : undefined;
+    return { title: item.name, subtitle: price, body: item.description || undefined };
+  }
+
+  function spellTip(id: number): TipContent | null {
+    const spell = data.value?.spells[id];
+    return spell ? { title: spell.name, body: spell.description || undefined } : null;
+  }
+
+  function perkTip(id: number): TipContent | null {
+    const name = data.value?.perkNames[id];
+    if (!name) return null;
+    return { title: name, body: data.value?.perkDescriptions[id] || undefined };
+  }
+
   function queueName(queueId: number, gameMode: string): string {
     return data.value?.queueNames[queueId] || gameMode || `队列 ${queueId}`;
   }
@@ -72,6 +91,9 @@ export const useGameDataStore = defineStore("gameData", () => {
     perkIcon,
     perkName,
     queueName,
+    itemTip,
+    spellTip,
+    perkTip,
   };
 });
 

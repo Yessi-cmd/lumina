@@ -115,6 +115,11 @@ async fn fetch(http: &LcuHttp) -> Result<GameData> {
     })
 }
 
+fn icons(assets: &[LcuIconAsset]) -> HashMap<i64, String> {
+    let icons = assets.iter().map(|a| (a.id, a.icon_path.clone()));
+    icons.collect()
+}
+
 fn described(assets: &[LcuIconAsset]) -> HashMap<i64, Described> {
     let mut out = HashMap::new();
     for asset in assets {
@@ -164,9 +169,4 @@ mod tests {
                       <passive>重伤</passive>：造成伤害</mainText>";
         assert_eq!(plain_text(markup), "40 攻击力\n\n重伤：造成伤害");
     }
-}
-
-fn icons(assets: &[LcuIconAsset]) -> HashMap<i64, String> {
-    let icons = assets.iter().map(|a| (a.id, a.icon_path.clone()));
-    icons.collect()
 }
