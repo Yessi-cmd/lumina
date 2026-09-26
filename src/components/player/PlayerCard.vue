@@ -94,9 +94,9 @@ const hiddenTags = computed(() => tags.value.slice(MAX_TAGS));
 
 const powerClass = computed(() => {
   const p = props.power?.power ?? 50;
-  if (p >= 60) return "border-emerald-500/60 text-emerald-300";
-  if (p <= 40) return "border-red-500/60 text-red-300";
-  return "border-zinc-600 text-zinc-300";
+  if (p >= 60) return "bg-emerald-400/10 text-emerald-300 ring-emerald-400/30";
+  if (p <= 40) return "bg-red-400/10 text-red-300 ring-red-400/30";
+  return "bg-white/5 text-zinc-300 ring-white/10";
 });
 
 const winRateClass = computed(() => {
@@ -117,8 +117,12 @@ function openHistory() {
 
 <template>
   <div
-    class="flex w-full cursor-pointer items-start gap-2.5 rounded-lg border bg-zinc-900 px-2.5 py-2 hover:bg-zinc-800/80"
-    :class="player.isSelf ? 'border-amber-500/60' : 'border-zinc-800'"
+    class="group flex w-full cursor-pointer items-start gap-3 rounded-xl border bg-zinc-900/75 px-3 py-2.5 transition-colors hover:bg-zinc-800/60"
+    :class="
+      player.isSelf
+        ? 'border-amber-400/40 shadow-[0_0_0_1px_rgb(245_158_11/0.1),0_8px_24px_-14px_rgb(245_158_11/0.5)]'
+        : 'border-white/[0.06] hover:border-white/10'
+    "
     @click="openHistory"
   >
     <div class="relative shrink-0">
@@ -126,12 +130,12 @@ function openHistory() {
         v-if="player.championId > 0"
         :src="gd.championIcon(player.championId)"
         :title="gd.championName(player.championId)"
-        class="size-10 rounded-md bg-zinc-800"
+        class="size-11 rounded-lg bg-zinc-800 ring-1 ring-white/10"
       />
-      <div v-else class="size-10 rounded-md bg-zinc-800" />
+      <div v-else class="size-11 rounded-lg bg-zinc-800 ring-1 ring-white/10" />
       <span
         v-if="POSITIONS[player.position]"
-        class="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded bg-zinc-950 px-1 text-[10px] text-zinc-300"
+        class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 rounded-md border border-white/10 bg-zinc-950 px-1 text-[10px] whitespace-nowrap text-zinc-300"
       >
         {{ POSITIONS[player.position] }}
       </span>
@@ -139,13 +143,13 @@ function openHistory() {
 
     <div class="min-w-0 flex-1">
       <div class="flex items-baseline gap-2">
-        <span class="truncate font-medium">{{ name }}</span>
+        <span class="truncate font-medium text-zinc-100 select-text">{{ name }}</span>
         <span v-if="summoner" class="shrink-0 text-xs text-zinc-500">
           Lv.{{ summoner.summonerLevel }}
         </span>
         <span
           v-if="power"
-          class="ml-auto shrink-0 rounded border px-1.5 text-xs tabular-nums"
+          class="ml-auto shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ring-1 ring-inset"
           :class="powerClass"
           :title="power.breakdown"
         >
@@ -153,11 +157,11 @@ function openHistory() {
         </span>
       </div>
 
-      <div v-if="tags.length" class="mt-0.5 flex flex-wrap gap-1" @click.stop>
+      <div v-if="tags.length" class="mt-1 flex flex-wrap gap-1" @click.stop>
         <TagChip v-for="tag in shownTags" :key="tag.id + tag.label" :tag="tag" />
         <span
           v-if="hiddenTags.length"
-          class="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] leading-none text-zinc-400"
+          class="rounded-md bg-white/5 px-1.5 py-[3px] text-[11px] leading-none text-zinc-400 ring-1 ring-white/10 ring-inset"
           :title="hiddenTags.map((t) => `${t.label}：${t.detail}`).join('\n')"
         >
           +{{ hiddenTags.length }}
@@ -208,7 +212,7 @@ function openHistory() {
               :key="c.championId"
               :src="gd.championIcon(c.championId)"
               :title="`${gd.championName(c.championId)} ${c.wins}胜${c.games - c.wins}负`"
-              class="size-5 rounded bg-zinc-800"
+              class="size-5 rounded-md bg-zinc-800 ring-1 ring-white/10"
             />
           </div>
         </div>

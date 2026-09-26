@@ -31,10 +31,10 @@ const POSITIONS: Record<string, string> = {
 };
 
 const ADVICE_TONE: Record<TagTone, string> = {
-  positive: "border-emerald-700/60 bg-emerald-950/40",
-  negative: "border-red-700/60 bg-red-950/40",
-  warning: "border-amber-700/60 bg-amber-950/30",
-  neutral: "border-zinc-700 bg-zinc-900",
+  positive: "border-emerald-400/20 bg-linear-to-br from-emerald-500/10 to-emerald-500/[0.02]",
+  negative: "border-red-400/20 bg-linear-to-br from-red-500/10 to-red-500/[0.02]",
+  warning: "border-amber-400/20 bg-linear-to-br from-amber-500/10 to-amber-500/[0.02]",
+  neutral: "border-white/[0.06] bg-zinc-900/75",
 };
 
 function championOf(puuid: string): number {
@@ -47,11 +47,23 @@ function championOf(puuid: string): number {
 </script>
 
 <template>
-  <section class="flex max-w-5xl flex-col gap-4">
-    <h1 class="text-xl font-semibold">{{ title }}</h1>
+  <section class="flex max-w-6xl flex-col gap-5">
+    <header>
+      <div class="eyebrow">Live game</div>
+      <h1 class="page-title mt-1 flex items-center gap-3">
+        {{ title }}
+        <span
+          v-if="roster && roster.stage !== 'lobby'"
+          class="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-xs font-medium tracking-normal text-emerald-300"
+        >
+          <span class="size-1.5 animate-pulse rounded-full bg-emerald-400" />
+          实时
+        </span>
+      </h1>
+    </header>
 
-    <p v-if="!lcu.connected" class="text-sm text-zinc-400">连接英雄联盟客户端后显示对局信息。</p>
-    <p v-else-if="!roster" class="text-sm text-zinc-400">
+    <p v-if="!lcu.connected" class="empty-state">连接英雄联盟客户端后显示对局信息。</p>
+    <p v-else-if="!roster" class="empty-state">
       进入房间后显示房间成员，英雄选择时显示队友，进入加载界面后显示敌方。
     </p>
 
@@ -60,25 +72,29 @@ function championOf(puuid: string): number {
         <div
           v-for="(a, i) in insights.advice"
           :key="i"
-          class="flex items-start gap-2 rounded-lg border p-2.5"
+          class="flex items-start gap-3 rounded-xl border p-3"
           :class="ADVICE_TONE[a.tone]"
         >
           <img
             v-if="championOf(a.puuid) > 0"
             :src="gd.championIcon(championOf(a.puuid))"
-            class="size-8 shrink-0 rounded bg-zinc-800"
+            class="size-9 shrink-0 rounded-lg bg-zinc-800 ring-1 ring-white/10"
           />
           <div class="min-w-0">
-            <div class="text-sm font-medium">{{ a.title }}</div>
+            <div class="text-sm font-semibold text-zinc-100">{{ a.title }}</div>
             <div class="text-xs leading-5 text-zinc-400">{{ a.detail }}</div>
           </div>
         </div>
       </div>
-      <p v-else-if="!insights" class="text-xs text-zinc-500">正在分析双方战绩与对线数据…</p>
+      <p v-else-if="!insights" class="flex items-center gap-2 text-xs text-zinc-500">
+        <span class="size-3 animate-spin rounded-full border-2 border-zinc-600 border-t-amber-400" />
+        正在分析双方战绩与对线数据…
+      </p>
 
       <div class="grid grid-cols-2 gap-6">
         <div class="flex flex-col gap-2">
-          <h2 class="text-sm font-medium text-sky-300">
+          <h2 class="flex items-center gap-2 px-1 text-sm font-semibold text-sky-300">
+            <span class="h-3.5 w-1 rounded-full bg-sky-400" />
             {{ roster.stage === "lobby" ? "房间成员" : "我方" }}
           </h2>
           <PlayerCard
@@ -92,14 +108,14 @@ function championOf(puuid: string): number {
           <div
             v-for="(a, i) in roster.anonymousAllies"
             :key="`anonymous-${i}`"
-            class="flex items-center gap-3 rounded-lg border border-dashed border-zinc-700 bg-zinc-900/50 p-3"
+            class="flex items-center gap-3 rounded-xl border border-dashed border-white/10 bg-zinc-900/40 p-3"
           >
             <img
               v-if="a.championId > 0"
               :src="gd.championIcon(a.championId)"
-              class="size-10 shrink-0 rounded bg-zinc-800"
+              class="size-11 shrink-0 rounded-lg bg-zinc-800 opacity-80 ring-1 ring-white/10"
             />
-            <div v-else class="size-10 shrink-0 rounded bg-zinc-800" />
+            <div v-else class="size-11 shrink-0 rounded-lg bg-zinc-800 ring-1 ring-white/10" />
             <div class="min-w-0">
               <div class="text-sm font-medium text-zinc-300">
                 匿名队友
@@ -117,7 +133,10 @@ function championOf(puuid: string): number {
             :champion-id="me?.championId ?? 0"
             :enemy-champions="roster.enemyChampions"
           />
-          <h2 v-else class="text-sm font-medium text-red-300">敌方</h2>
+          <h2 v-else class="flex items-center gap-2 px-1 text-sm font-semibold text-red-300">
+            <span class="h-3.5 w-1 rounded-full bg-red-400" />
+            敌方
+          </h2>
           <PlayerCard
             v-for="p in roster.enemies"
             :key="p.puuid"
@@ -128,13 +147,13 @@ function championOf(puuid: string): number {
           />
           <div
             v-if="roster.stage === 'lobby'"
-            class="rounded-lg border border-dashed border-zinc-800 p-4 text-center text-sm text-zinc-500"
+            class="empty-state"
           >
             开始排队并进入英雄选择后显示队友，进入加载界面后显示敌方。
           </div>
           <div
             v-if="roster.hiddenEnemies > 0 && roster.stage !== 'champSelect'"
-            class="rounded-lg border border-dashed border-zinc-800 p-4 text-center text-sm text-zinc-500"
+            class="empty-state"
           >
             {{ roster.hiddenEnemies }} 名敌方玩家身份不可见。
           </div>

@@ -27,19 +27,25 @@ const seconds = computed(() => {
 </script>
 
 <template>
-  <div
-    v-if="store.pendingAccept"
-    class="flex items-center gap-3 border-b border-amber-700/60 bg-amber-950/60 px-4 py-2 text-sm"
+  <Transition
+    enter-from-class="-translate-y-2 opacity-0"
+    leave-to-class="-translate-y-2 opacity-0"
+    enter-active-class="transition duration-200"
+    leave-active-class="transition duration-150"
   >
-    <span class="font-medium text-amber-200">找到对局</span>
-    <span class="text-amber-100/80">
-      {{ seconds > 0 ? `${seconds} 秒后自动接受` : "正在接受…" }}
-    </span>
-    <button
-      class="ml-auto rounded-md border border-amber-600/70 px-3 py-1 text-amber-100 hover:bg-amber-900/60"
-      @click="store.cancelAutoAccept()"
+    <div
+      v-if="store.pendingAccept"
+      class="mx-6 mb-2 flex items-center gap-3 rounded-xl border border-amber-400/25 bg-linear-to-r from-amber-500/15 to-amber-500/5 px-4 py-2.5 text-sm shadow-[0_8px_24px_-12px_rgb(245_158_11/0.5)]"
     >
-      取消本次
-    </button>
-  </div>
+      <span class="relative flex size-2.5">
+        <span class="absolute inline-flex size-full animate-ping rounded-full bg-amber-400 opacity-60" />
+        <span class="relative inline-flex size-2.5 rounded-full bg-amber-400" />
+      </span>
+      <span class="font-semibold text-amber-200">找到对局</span>
+      <span class="text-amber-100/70 tabular-nums">
+        {{ seconds > 0 ? `${seconds} 秒后自动接受` : "正在接受…" }}
+      </span>
+      <button class="btn btn-secondary ml-auto py-1" @click="store.cancelAutoAccept()">取消本次</button>
+    </div>
+  </Transition>
 </template>

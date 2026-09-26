@@ -147,13 +147,13 @@ function purchaseGroups(build: PlayerBuild): { minute: number; items: number[] }
 </script>
 
 <template>
-  <div class="border-t border-zinc-800 bg-zinc-950/60 px-3 py-2" @click.stop>
-    <div class="mb-2 flex gap-1">
+  <div class="animate-fade-in border-t border-white/[0.06] bg-zinc-950/40 px-3 py-3" @click.stop>
+    <div class="segmented mb-3">
       <button
         v-for="t in TABS"
         :key="t.id"
-        class="rounded px-2.5 py-0.5 text-xs"
-        :class="tab === t.id ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:bg-zinc-800'"
+        class="segment"
+        :class="tab === t.id && 'segment-active'"
         @click="tab = t.id"
       >
         {{ t.label }}
@@ -205,7 +205,7 @@ function purchaseGroups(build: PlayerBuild): { minute: number; items: number[] }
             <tr
               v-for="p in team.players"
               :key="p.puuid || p.championId"
-              class="border-t border-zinc-900"
+              class="border-t border-white/[0.04]"
               :class="p.puuid === puuid && 'bg-amber-500/10'"
             >
               <td class="py-1">
@@ -257,9 +257,9 @@ function purchaseGroups(build: PlayerBuild): { minute: number; items: number[] }
               <td class="text-right text-zinc-400 tabular-nums" title="参团率">{{ kp(p, team) }}</td>
               <td class="pl-3">
                 <div class="flex items-center gap-1" :title="`对英雄伤害 ${p.damageToChampions}`">
-                  <div class="h-1.5 flex-1 rounded bg-zinc-800">
+                  <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
                     <div
-                      class="h-1.5 rounded bg-rose-500/80"
+                      class="h-1.5 rounded-full bg-linear-to-r from-rose-500 to-orange-400"
                       :style="{ width: `${(p.damageToChampions / maxDamage) * 100}%` }"
                     />
                   </div>
@@ -310,7 +310,7 @@ function purchaseGroups(build: PlayerBuild): { minute: number; items: number[] }
           </tr>
         </thead>
         <tbody>
-          <tr v-for="row in STAT_ROWS" :key="row.label" class="border-t border-zinc-900">
+          <tr v-for="row in STAT_ROWS" :key="row.label" class="border-t border-white/[0.04]">
             <td class="py-1 text-zinc-500">{{ row.label }}</td>
             <td
               v-for="(p, i) in players"
@@ -336,8 +336,8 @@ function purchaseGroups(build: PlayerBuild): { minute: number; items: number[] }
         <div
           v-for="p in players"
           :key="p.puuid"
-          class="grid grid-cols-[8rem_1fr] items-start gap-2 border-t border-zinc-900 pt-2 text-xs"
-          :class="p.puuid === puuid && 'rounded bg-amber-500/10'"
+          class="grid grid-cols-[8rem_1fr] items-start gap-2 border-t border-white/[0.04] pt-2 text-xs"
+          :class="p.puuid === puuid && 'rounded-md bg-amber-500/10'"
         >
           <div class="flex items-center gap-1.5">
             <img :src="gd.championIcon(p.championId)" class="size-7 rounded bg-zinc-800" />
@@ -380,7 +380,7 @@ function purchaseGroups(build: PlayerBuild): { minute: number; items: number[] }
         v-for="p in players"
         :key="p.puuid || p.championId"
         class="flex items-center gap-2 text-xs"
-        :class="p.puuid === puuid && 'rounded bg-amber-500/10'"
+        :class="p.puuid === puuid && 'rounded-md bg-amber-500/10'"
       >
         <img :src="gd.championIcon(p.championId)" class="size-7 rounded bg-zinc-800" />
         <span class="w-20 truncate text-zinc-300" :title="name(p)">{{ p.gameName || "未知玩家" }}</span>

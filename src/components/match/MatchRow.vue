@@ -14,8 +14,18 @@ const gd = useGameDataStore();
 const expanded = ref(false);
 
 const RESULT: Record<GameResult, { label: string; bar: string; text: string; bg: string }> = {
-  win: { label: "胜利", bar: "bg-emerald-500", text: "text-emerald-400", bg: "bg-emerald-950/20" },
-  loss: { label: "失败", bar: "bg-red-500", text: "text-red-400", bg: "bg-red-950/20" },
+  win: {
+    label: "胜利",
+    bar: "bg-linear-to-b from-emerald-300 to-emerald-500",
+    text: "text-emerald-400",
+    bg: "bg-linear-to-r from-emerald-500/[0.09] via-transparent to-transparent",
+  },
+  loss: {
+    label: "失败",
+    bar: "bg-linear-to-b from-red-300 to-red-500",
+    text: "text-red-400",
+    bg: "bg-linear-to-r from-red-500/[0.09] via-transparent to-transparent",
+  },
   remake: { label: "重开", bar: "bg-zinc-500", text: "text-zinc-400", bg: "" },
   abort: { label: "中止", bar: "bg-zinc-600", text: "text-zinc-500", bg: "" },
 };
@@ -47,13 +57,16 @@ const lineup = computed(() => {
 </script>
 
 <template>
-  <div class="overflow-hidden rounded-md bg-zinc-900" :class="result.bg">
+  <div
+    class="overflow-hidden rounded-lg border bg-zinc-900/70 transition-colors"
+    :class="[result.bg, expanded ? 'border-white/10' : 'border-white/[0.04] hover:border-white/10']"
+  >
     <div
-      class="grid cursor-pointer grid-cols-[4px_6.5rem_2.75rem_1.25rem_1.25rem_7rem_7.5rem_minmax(0,1fr)_auto_7.5rem] items-center gap-x-2.5 py-1.5 pr-3 hover:bg-zinc-800/60"
+      class="grid cursor-pointer grid-cols-[4px_6.5rem_2.75rem_1.25rem_1.25rem_7rem_7.5rem_minmax(0,1fr)_auto_7.5rem] items-center gap-x-2.5 py-1.5 pr-3 transition-colors hover:bg-white/[0.025]"
       :title="expanded ? '收起对局详情' : '展开对局详情'"
       @click="expanded = !expanded"
     >
-      <div class="h-11 self-stretch" :class="result.bar" />
+      <div class="my-1 w-[3px] self-stretch rounded-r-full" :class="result.bar" />
 
       <div class="min-w-0 text-xs leading-5">
         <div class="font-medium" :class="result.text">
@@ -72,9 +85,9 @@ const lineup = computed(() => {
         <img
           :src="gd.championIcon(game.championId)"
           :title="gd.championName(game.championId)"
-          class="size-11 rounded-md bg-zinc-800"
+          class="size-11 rounded-lg bg-zinc-800 ring-1 ring-white/10"
         />
-        <span class="absolute -right-1 -bottom-1 rounded bg-zinc-950 px-1 text-[10px] text-zinc-300">
+        <span class="absolute -right-1 -bottom-1 rounded-md border border-white/10 bg-zinc-950 px-1 text-[10px] text-zinc-300 tabular-nums">
           {{ game.champLevel }}
         </span>
       </div>
@@ -111,7 +124,7 @@ const lineup = computed(() => {
           KDA {{ kda }}
           <span
             v-if="multiKill"
-            class="ml-1 rounded bg-rose-700/80 px-1 text-[10px] text-white"
+            class="ml-1 rounded-full bg-linear-to-r from-rose-500 to-orange-500 px-1.5 text-[10px] font-medium text-white"
           >
             {{ multiKill }}
           </span>

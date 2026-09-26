@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { onMounted, watch } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onMounted, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import AppIcon, { type IconName } from "./components/common/AppIcon.vue";
 import AutoAcceptBanner from "./components/common/AutoAcceptBanner.vue";
+import TitleBar from "./components/common/TitleBar.vue";
 import { useAppStore } from "./stores/app";
-import { useGameDataStore } from "./stores/gameData";
+import { profileIconUrl, useGameDataStore } from "./stores/gameData";
 import { phaseLabel, useLcuStore } from "./stores/lcu";
 import { useOngoingStore } from "./stores/ongoing";
 import { useSettingsStore } from "./stores/settings";
@@ -15,6 +17,7 @@ useGameDataStore();
 const ongoing = useOngoingStore();
 const settings = useSettingsStore();
 const router = useRouter();
+const route = useRoute();
 
 // Jump to the game panel when champ select starts and again when the game loads.
 watch(
@@ -26,12 +29,30 @@ watch(
   },
 );
 
-const navItems = [
-  { to: "/", label: "概览" },
-  { to: "/match-history", label: "战绩" },
-  { to: "/ongoing-game", label: "对局" },
-  { to: "/settings", label: "设置" },
+const navItems: { to: string; label: string; icon: IconName }[] = [
+  { to: "/", label: "概览", icon: "dashboard" },
+  { to: "/match-history", label: "战绩", icon: "history" },
+  { to: "/ongoing-game", label: "对局", icon: "swords" },
+  { to: "/settings", label: "设置", icon: "settings" },
 ];
+
+const pageTitle = computed(() => navItems.find((i) => i.to === route.path)?.label ?? "");
+
+const summoner = computed(() => lcu.snapshot.summoner);
+const summonerName = computed(() => {
+  const s = summoner.value;
+  if (!s) return "未登录";
+  return s.gameName || s.displayName || "未登录";
+});
+const statusText = computed(() => {
+  if (lcu.connected) return phaseLabel(lcu.snapshot.gameflowPhase);
+  return lcu.snapshot.status === "connecting" ? "连接中…" : "未连接客户端";
+});
+const statusDot = computed(() => {
+  if (lcu.connected) return "bg-emerald-400 shadow-[0_0_8px] shadow-emerald-400/70";
+  if (lcu.snapshot.status === "connecting") return "animate-pulse bg-amber-400";
+  return "bg-zinc-500";
+});
 
 onMounted(() => {
   app.load().catch((err) => console.error("Failed to load app info", err));
@@ -43,33 +64,82 @@ onMounted(() => {
 
 <template>
   <div class="flex h-full">
-    <aside class="flex w-44 shrink-0 flex-col border-r border-zinc-800 bg-zinc-900 p-3">
-      <div class="mb-6 px-2 text-lg font-semibold tracking-wide text-amber-300">Lumina</div>
-      <nav class="flex flex-col gap-1">
+    <aside
+      class="flex w-56 shrink-0 flex-col border-r border-white/[0.06] bg-zinc-950/50 px-3 pb-3 select-none"
+    >
+      <div data-tauri-drag-region class="flex h-16 items-center gap-2.5 px-2">
+        <div
+          class="flex size-8 items-center justify-center rounded-lg bg-linear-to-br from-amber-300 to-orange-500 text-zinc-950 shadow-[0_6px_18px_-6px_rgb(245_158_11/0.7)]"
+        >
+          <AppIcon name="sparkle" :size="17" :stroke-width="2.2" />
+        </div>
+        <div data-tauri-drag-region class="leading-tight">
+          <div class="text-[15px] font-semibold tracking-tight text-zinc-50">Lumina</div>
+          <div class="text-[11px] text-zinc-500">v{{ app.info?.version ?? "-" }}</div>
+        </div>
+      </div>
+
+      <nav class="mt-2 flex flex-col gap-0.5">
         <RouterLink
           v-for="item in navItems"
           :key="item.to"
           :to="item.to"
-          class="rounded-md px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
-          active-class="bg-zinc-800 text-white"
+          class="group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-100"
+          active-class="nav-active"
+          exact-active-class="nav-active"
         >
+          <span
+            class="nav-indicator absolute top-1/2 left-0 h-4 w-[3px] -translate-y-1/2 rounded-full bg-amber-400 opacity-0 transition-opacity"
+          />
+          <AppIcon :name="item.icon" :size="17" />
           {{ item.label }}
         </RouterLink>
       </nav>
-      <div class="mt-auto flex items-center gap-2 px-2 text-xs text-zinc-400">
-        <span
-          class="size-2 rounded-full"
-          :class="lcu.connected ? 'bg-emerald-400' : 'bg-zinc-600'"
-        />
-        {{ lcu.connected ? phaseLabel(lcu.snapshot.gameflowPhase) : "未连接" }}
+
+      <div class="mt-auto flex items-center gap-2.5 rounded-xl border border-white/[0.06] bg-white/[0.03] p-2.5">
+        <div class="relative shrink-0">
+          <img
+            v-if="summoner"
+            :src="profileIconUrl(summoner.profileIconId)"
+            class="size-9 rounded-full bg-zinc-800 ring-1 ring-white/10"
+          />
+          <div v-else class="flex size-9 items-center justify-center rounded-full bg-zinc-800 text-zinc-500">
+            <AppIcon name="user" :size="16" />
+          </div>
+          <span
+            class="absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full ring-2 ring-zinc-950"
+            :class="statusDot"
+          />
+        </div>
+        <div class="min-w-0">
+          <div class="truncate text-sm font-medium text-zinc-100">{{ summonerName }}</div>
+          <div class="truncate text-xs text-zinc-500">{{ statusText }}</div>
+        </div>
       </div>
-      <div class="mt-2 px-2 text-xs text-zinc-500">v{{ app.info?.version ?? "-" }}</div>
     </aside>
+
     <div class="flex min-w-0 flex-1 flex-col">
+      <TitleBar :title="pageTitle" />
       <AutoAcceptBanner />
-      <main class="min-w-0 flex-1 overflow-auto p-6">
-        <RouterView />
+      <main class="min-w-0 flex-1 overflow-auto px-6 pt-2 pb-8">
+        <RouterView v-slot="{ Component, route: current }">
+          <div :key="current.path" class="animate-fade-in">
+            <component :is="Component" />
+          </div>
+        </RouterView>
       </main>
     </div>
   </div>
 </template>
+
+<style scoped>
+@reference "./style.css";
+
+.nav-active {
+  @apply bg-white/[0.07] text-zinc-50;
+}
+
+.nav-active .nav-indicator {
+  @apply opacity-100;
+}
+</style>

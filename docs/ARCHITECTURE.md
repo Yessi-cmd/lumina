@@ -29,6 +29,9 @@
 - 所有状态由 Rust 维护，前端只做展示。
 - LCU WebSocket 事件 → 更新 `state` → emit Tauri event → Pinia store。
 - 前端不直接访问 LCU/SGP，拿不到任何 token。
+- 窗口无原生边框（`decorations: false`），标题栏与最小化/最大化/关闭按钮由 `TitleBar.vue` 自绘，
+  拖动区域用 `data-tauri-drag-region`。主题色集中在 `style.css`：zinc 色阶被重定义为 Lumina 的中性色，
+  通用样式为 `.card` / `.btn-*` / `.field` / `.segmented`，图标为内联 SVG（`AppIcon.vue`），不引入组件库或图标包。
 
 ## 3. 模块
 

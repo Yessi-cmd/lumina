@@ -200,15 +200,15 @@ async function apply() {
 </script>
 
 <template>
-  <div class="flex flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-900 p-3">
+  <div class="card flex flex-col gap-3 p-4">
     <div class="flex items-center gap-2">
       <h2 class="text-sm font-medium text-amber-300">选英雄</h2>
-      <div class="ml-auto flex gap-1">
+      <div class="segmented ml-auto">
         <button
           v-for="p in POSITIONS"
           :key="p.id"
-          class="rounded px-2 py-0.5 text-xs"
-          :class="lane === p.id ? 'bg-amber-500 text-zinc-950' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'"
+          class="segment"
+          :class="lane === p.id && 'bg-amber-500! text-zinc-950! shadow-sm'"
           @click="lane = p.id"
         >
           {{ p.label }}
@@ -217,9 +217,9 @@ async function apply() {
     </div>
 
     <!-- Build of the selected champion -->
-    <div v-if="selected > 0" class="rounded-md bg-zinc-950/60 p-2.5">
+    <div v-if="selected > 0" class="rounded-lg border border-white/[0.05] bg-zinc-950/50 p-3">
       <div class="flex items-center gap-2">
-        <img :src="gd.championIcon(selected)" class="size-9 rounded bg-zinc-800" />
+        <img :src="gd.championIcon(selected)" class="size-10 rounded-lg bg-zinc-800 ring-1 ring-white/10" />
         <div class="min-w-0">
           <div class="text-sm font-medium">{{ gd.championName(selected) }} · {{ laneLabel }}</div>
           <div v-if="build" class="text-xs text-zinc-400">
@@ -233,12 +233,12 @@ async function apply() {
       <p v-if="buildError" class="mt-2 text-xs text-red-400">{{ buildError }}</p>
       <p v-else-if="!build" class="mt-2 text-xs text-zinc-500">加载出装数据…</p>
       <template v-else-if="variant">
-        <div class="mt-2 flex gap-1">
+        <div class="segmented mt-2.5">
           <button
             v-for="(v, i) in build.variants"
             :key="v.label"
-            class="rounded px-2 py-0.5 text-xs"
-            :class="variantIndex === i ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:bg-zinc-800'"
+            class="segment"
+            :class="variantIndex === i && 'segment-active'"
             @click="variantIndex = i"
           >
             {{ v.label }}
@@ -282,7 +282,7 @@ async function apply() {
 
         <div class="mt-2.5 flex items-center gap-2">
           <button
-            class="rounded-md bg-amber-500 px-3 py-1 text-xs font-medium text-zinc-950 hover:bg-amber-400 disabled:opacity-50"
+            class="btn btn-primary py-1 text-xs"
             :disabled="applying"
             @click="apply"
           >
@@ -294,7 +294,7 @@ async function apply() {
     </div>
 
     <!-- Matchups from high-rank games -->
-    <div v-if="selected > 0" class="rounded-md bg-zinc-950/60 p-2.5 text-xs">
+    <div v-if="selected > 0" class="rounded-lg border border-white/[0.05] bg-zinc-950/50 p-3 text-xs">
       <div class="mb-1.5 flex items-center gap-2 text-zinc-500">
         <span>对位克制（{{ TIER_NAMES[matchups?.tier ?? ""] ?? "高分段" }}，同位置）</span>
         <span class="ml-auto" title="扣除双方英雄整体强度后的胜率差；超出误差范围才判定克制">
@@ -305,7 +305,7 @@ async function apply() {
       <p v-else-if="!matchups" class="text-zinc-500">加载对位数据…</p>
       <template v-else>
         <!-- The lane opponent: picked by hand, or the one enemy pick that usually plays this lane -->
-        <div class="mb-2 rounded border border-zinc-800 p-2">
+        <div class="mb-2 rounded-lg border border-white/[0.06] p-2.5">
           <div class="flex items-center gap-2">
             <span class="text-zinc-400">我的对位</span>
             <span v-if="pinnedOpponent" class="text-zinc-600">手动指定</span>
@@ -343,7 +343,7 @@ async function apply() {
           <input
             v-model="opponentQuery"
             placeholder="搜索英雄，指定对位…"
-            class="mt-2 w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 outline-none focus:border-amber-400"
+            class="field mt-2 w-full py-1 text-xs"
           />
           <div v-if="opponentResults.length" class="mt-1 flex flex-wrap gap-1">
             <button
@@ -363,7 +363,7 @@ async function apply() {
           <button
             v-for="m in matchups.againstPicks"
             :key="m.championId"
-            class="flex items-center gap-2 rounded px-1 py-0.5 text-left hover:bg-zinc-800"
+            class="flex items-center gap-2 rounded px-1 py-0.5 text-left hover:bg-white/[0.05]"
             :class="[
               m.championId === opponentId && 'bg-zinc-800',
               m.usualPosition !== lane && 'opacity-60',
@@ -425,8 +425,8 @@ async function apply() {
         <button
           v-for="e in visible"
           :key="e.championId"
-          class="flex items-center gap-1.5 rounded px-1.5 py-1 text-left text-xs hover:bg-zinc-800"
-          :class="selected === e.championId && 'bg-zinc-800'"
+          class="flex items-center gap-1.5 rounded px-1.5 py-1 text-left text-xs hover:bg-white/[0.05]"
+          :class="selected === e.championId && 'bg-white/[0.07]'"
           @click="selected = e.championId"
         >
           <img :src="gd.championIcon(e.championId)" class="size-6 rounded bg-zinc-800" />

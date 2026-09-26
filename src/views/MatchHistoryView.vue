@@ -2,6 +2,7 @@
 import { computed, ref, shallowRef, watch } from "vue";
 import { useRoute } from "vue-router";
 import { api, PANEL_HISTORY_COUNT, type DataSource, type GameSummary, type Summoner } from "../api";
+import AppIcon from "../components/common/AppIcon.vue";
 import MatchRow from "../components/match/MatchRow.vue";
 import { profileIconUrl, useGameDataStore } from "../stores/gameData";
 import { useLcuStore } from "../stores/lcu";
@@ -155,83 +156,117 @@ watch(
 </script>
 
 <template>
-  <section class="flex max-w-5xl flex-col gap-4">
-    <div class="flex items-center gap-3">
-      <h1 class="text-xl font-semibold">战绩</h1>
+  <section class="flex max-w-6xl flex-col gap-4">
+    <header class="flex items-end gap-4">
+      <div>
+        <div class="eyebrow">Match history</div>
+        <h1 class="page-title mt-1">战绩</h1>
+      </div>
       <form class="ml-auto flex gap-2" @submit.prevent="search">
-        <input
-          v-model="query"
-          placeholder="名字#标签"
-          class="w-64 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm outline-none focus:border-amber-400"
-        />
-        <button
-          type="submit"
-          :disabled="!lcu.connected"
-          class="rounded-md bg-amber-500 px-3 py-1.5 text-sm font-medium text-zinc-950 hover:bg-amber-400 disabled:opacity-40"
-        >
-          查询
-        </button>
+        <div class="relative">
+          <AppIcon
+            name="search"
+            :size="15"
+            class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-zinc-500"
+          />
+          <input v-model="query" placeholder="名字#标签" class="field w-64 pl-9" />
+        </div>
+        <button type="submit" :disabled="!lcu.connected" class="btn btn-primary">查询</button>
         <button
           type="button"
           :disabled="!lcu.snapshot.summoner"
-          class="rounded-md border border-zinc-700 px-3 py-1.5 text-sm hover:bg-zinc-800 disabled:opacity-40"
+          class="btn btn-secondary"
           @click="showSelf"
         >
+          <AppIcon name="user" :size="15" />
           我自己
         </button>
       </form>
-    </div>
+    </header>
 
-    <p v-if="!lcu.connected" class="text-sm text-zinc-400">连接英雄联盟客户端后才能查询战绩。</p>
+    <p v-if="!lcu.connected" class="empty-state">连接英雄联盟客户端后才能查询战绩。</p>
 
-    <div v-if="summoner" class="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900 p-3">
-      <img :src="profileIconUrl(summoner.profileIconId)" class="size-12 rounded-full bg-zinc-800" />
-      <div class="min-w-0">
-        <div class="truncate text-lg font-medium">{{ riotId }}</div>
-        <div class="text-sm text-zinc-400">等级 {{ summoner.summonerLevel }}</div>
-      </div>
-      <div v-if="source" class="ml-auto text-right text-xs">
-        <span
-          class="rounded px-1.5 py-0.5"
-          :class="source === 'sgp' ? 'bg-emerald-900 text-emerald-300' : 'bg-zinc-800 text-zinc-300'"
-        >
-          数据来源 {{ source.toUpperCase() }}
-        </span>
-        <div v-if="sgpError" class="mt-1 max-w-xs truncate text-zinc-500" :title="sgpError">
-          SGP 不可用：{{ sgpError }}
+    <div v-if="summoner" class="card relative overflow-hidden p-4">
+      <div class="pointer-events-none absolute -top-20 -left-10 size-56 rounded-full bg-amber-500/10 blur-3xl" />
+      <div class="relative flex items-center gap-4">
+        <div class="relative shrink-0">
+          <img
+            :src="profileIconUrl(summoner.profileIconId)"
+            class="size-14 rounded-2xl bg-zinc-800 ring-2 ring-amber-400/30"
+          />
+          <span
+            class="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-zinc-900 px-1.5 text-[11px] text-zinc-300 tabular-nums"
+          >
+            {{ summoner.summonerLevel }}
+          </span>
+        </div>
+        <div class="min-w-0">
+          <div class="truncate text-lg font-semibold tracking-tight text-zinc-50 select-text">{{ riotId }}</div>
+          <div class="mt-1 flex items-center gap-2 text-xs">
+            <span
+              v-if="source"
+              class="rounded-full border px-2 py-0.5"
+              :class="
+                source === 'sgp'
+                  ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300'
+                  : 'border-white/10 bg-white/5 text-zinc-400'
+              "
+            >
+              数据来源 {{ source.toUpperCase() }}
+            </span>
+            <span v-if="sgpError" class="max-w-xs truncate text-zinc-500" :title="sgpError">
+              SGP 不可用：{{ sgpError }}
+            </span>
+          </div>
+        </div>
+
+        <div v-if="summary" class="ml-auto flex gap-6 pr-2">
+          <div class="text-right">
+            <div class="eyebrow">场次</div>
+            <div class="mt-0.5 text-lg font-semibold text-zinc-100 tabular-nums">
+              {{ summary.games }}
+              <span class="text-xs font-normal text-zinc-500">{{ summary.wins }} 胜</span>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="eyebrow">胜率</div>
+            <div
+              class="mt-0.5 text-lg font-semibold tabular-nums"
+              :class="summary.winRate >= 50 ? 'text-emerald-400' : 'text-red-400'"
+            >
+              {{ summary.winRate }}%
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="eyebrow">KDA</div>
+            <div class="mt-0.5 text-lg font-semibold text-zinc-100 tabular-nums">{{ summary.kda }}</div>
+          </div>
         </div>
       </div>
     </div>
 
-    <div v-if="summoner" class="flex flex-wrap items-center gap-2 text-sm">
-      <select
-        v-model="queueFilter"
-        class="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1"
-        @change="onQueueChange"
-      >
+    <div v-if="summoner" class="flex flex-wrap items-center gap-2">
+      <AppIcon name="filter" :size="15" class="text-zinc-500" />
+      <select v-model="queueFilter" class="field py-1" @change="onQueueChange">
         <option :value="null">全部模式</option>
         <option v-for="q in QUEUES" :key="q.id" :value="q.id">{{ q.label }}</option>
       </select>
-      <select v-model="championFilter" class="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1">
+      <select v-model="championFilter" class="field py-1">
         <option :value="null">全部英雄</option>
         <option v-for="c in championOptions" :key="c.id" :value="c.id">{{ c.name }}（{{ c.n }}）</option>
       </select>
       <button
         v-if="queueFilter !== null || championFilter !== null"
-        class="rounded-md px-2 py-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+        class="btn btn-ghost py-1"
         @click="clearFilters"
       >
+        <AppIcon name="close" :size="14" />
         清除筛选
       </button>
-      <span v-if="summary" class="ml-auto text-zinc-400">
-        {{ summary.games }} 场 {{ summary.wins }} 胜 ·
-        <span :class="summary.winRate >= 50 ? 'text-emerald-400' : 'text-red-400'">胜率 {{ summary.winRate }}%</span>
-        · KDA {{ summary.kda }}
+      <span v-if="championFilter !== null && hasMore" class="ml-auto text-xs text-zinc-500">
+        英雄筛选只在已加载的 {{ games.length }} 场里找，点底部“加载更多”可以往前翻。
       </span>
     </div>
-    <p v-if="championFilter !== null && hasMore" class="-mt-2 text-xs text-zinc-500">
-      英雄筛选只在已加载的 {{ games.length }} 场里找，点底部“加载更多”可以往前翻。
-    </p>
 
     <p v-if="error" class="text-sm break-all text-red-400">{{ error }}</p>
 
@@ -242,16 +277,19 @@ watch(
         :game="game"
         :puuid="summoner?.puuid ?? ''"
       />
+      <template v-if="loading && games.length === 0">
+        <div v-for="i in 6" :key="i" class="h-14 animate-pulse rounded-lg bg-white/[0.03]" />
+      </template>
     </div>
 
-    <p v-if="summoner && !loading && shown.length === 0 && !error" class="text-sm text-zinc-400">
+    <p v-if="summoner && !loading && shown.length === 0 && !error" class="empty-state">
       {{ games.length === 0 ? "没有找到对局记录。" : "已加载的对局里没有这个英雄。" }}
     </p>
 
     <button
-      v-if="hasMore || loading"
+      v-if="hasMore || (loading && games.length > 0)"
       :disabled="loading"
-      class="self-center rounded-md border border-zinc-700 px-4 py-1.5 text-sm hover:bg-zinc-800 disabled:opacity-50"
+      class="btn btn-secondary self-center px-6"
       @click="loadMore()"
     >
       {{ loading ? "加载中…" : "加载更多" }}
