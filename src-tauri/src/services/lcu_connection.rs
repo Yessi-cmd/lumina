@@ -163,7 +163,8 @@ fn event_router(app: AppHandle) -> UriRouter {
             ongoing_game::on_phase(&phase_app, &phase);
             auto_accept::on_phase(&phase_app, &phase);
             panel_window::on_phase(&phase_app, &phase);
-            phase_app.state::<AppState>().set_gameflow_phase(phase.clone());
+            let state = phase_app.state::<AppState>();
+            state.set_gameflow_phase(phase.clone());
             // After the phase is stored: the overlays check it on every tick.
             draft::on_phase(&phase_app, &phase);
             overlay_window::on_phase(&phase_app, &phase);

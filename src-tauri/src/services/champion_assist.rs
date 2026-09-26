@@ -230,7 +230,8 @@ impl ChampionAssist {
         enemies: &[i64],
         tier: &str,
     ) -> Result<MatchupReport> {
-        let rows = self.matchup_rows(session, champion_id, position, tier).await?;
+        let request = self.matchup_rows(session, champion_id, position, tier);
+        let rows = request.await?;
         Ok(report(&rows, enemies, position, tier))
     }
 
