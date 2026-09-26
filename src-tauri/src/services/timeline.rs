@@ -217,6 +217,7 @@ mod tests {
         GameParticipant {
             puuid: puuid.to_owned(),
             team_id,
+            champion_id: 0,
             position: position.to_owned(),
             jungler: position == "JUNGLE",
         }

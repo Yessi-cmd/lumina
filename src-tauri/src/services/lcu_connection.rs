@@ -1,6 +1,7 @@
 //! Keeps a connection to the League client alive: discover → connect → stream events,
 //! and start over whenever the client exits.
 
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -23,8 +24,11 @@ use crate::state::{AppState, ClientInfo, ConnectionStatus};
 const SCAN_INTERVAL: Duration = Duration::from_secs(2);
 /// How long to wait for a freshly started client to answer API calls.
 const READY_ATTEMPTS: u32 = 30;
-const UNREADABLE_HINT: &str =
-    "检测到英雄联盟客户端，但无法读取连接信息，需要以管理员身份运行 Lumina。";
+const UNREADABLE_HINT: &str = concat!(
+    "检测到英雄联盟客户端，但无法读取连接信息。",
+    "以管理员身份运行一次后，Lumina 会记住客户端位置，以后普通启动即可连接；",
+    "也可以在设置中填写客户端目录。"
+);
 
 const CURRENT_SUMMONER: &str = "/lol-summoner/v1/current-summoner";
 const GAMEFLOW_PHASE: &str = "/lol-gameflow/v1/gameflow-phase";
@@ -37,11 +41,14 @@ pub fn spawn(app: AppHandle) {
 
 async fn supervise(app: AppHandle) {
     loop {
-        let scan = tauri::async_runtime::spawn_blocking(discovery::discover).await;
         let state = app.state::<AppState>();
+        let known = known_client_dirs(&state);
+        let task = tauri::async_runtime::spawn_blocking(move || discovery::discover(&known));
+        let scan = task.await;
         match scan {
             Ok(Discovery::Found(creds)) => {
                 log::info!("found League client: {creds:?}");
+                remember_client_dir(&state, creds.client_dir.as_deref());
                 if let Err(err) = run_session(&app, &creds).await {
                     log::warn!("LCU session ended: {err}");
                     state.reset_lcu(Some(err.to_string()));
@@ -54,6 +61,31 @@ async fn supervise(app: AppHandle) {
             Err(err) => log::error!("process scan failed: {err}"),
         }
         tokio::time::sleep(SCAN_INTERVAL).await;
+    }
+}
+
+fn known_client_dirs(state: &AppState) -> Vec<PathBuf> {
+    let dir = state.settings().client_dir;
+    if dir.is_empty() {
+        Vec::new()
+    } else {
+        vec![PathBuf::from(dir)]
+    }
+}
+
+/// Saves where the client lives, so the next launch can read its lockfile without admin.
+fn remember_client_dir(state: &AppState, dir: Option<&Path>) {
+    let Some(dir) = dir.and_then(Path::to_str) else {
+        return;
+    };
+    let mut settings = state.settings();
+    if settings.client_dir == dir {
+        return;
+    }
+    settings.client_dir = dir.to_owned();
+    match state.set_settings(settings) {
+        Ok(_) => log::info!("remembered client directory {dir}"),
+        Err(err) => log::warn!("failed to save the client directory: {err}"),
     }
 }
 

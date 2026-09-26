@@ -877,6 +877,9 @@ mod tests {
             position: "MIDDLE".to_owned(),
             team_id: 100,
             vision_score: 20,
+            keystone: 0,
+            sub_style: 0,
+            largest_multi_kill: 0,
             metrics: None,
             participants: Vec::new(),
         }

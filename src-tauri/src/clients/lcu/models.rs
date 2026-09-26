@@ -76,6 +76,26 @@ pub struct LcuGame {
     pub end_of_game_result: String,
     pub participants: Vec<LcuParticipant>,
     pub participant_identities: Vec<LcuParticipantIdentity>,
+    pub teams: Vec<LcuTeam>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct LcuTeam {
+    pub team_id: i64,
+    pub bans: Vec<LcuBan>,
+    pub baron_kills: i64,
+    pub dragon_kills: i64,
+    pub rift_herald_kills: i64,
+    pub horde_kills: i64,
+    pub tower_kills: i64,
+    pub inhibitor_kills: i64,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct LcuBan {
+    pub champion_id: i64,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -112,6 +132,33 @@ pub struct LcuParticipantStats {
     pub total_damage_dealt_to_champions: i64,
     pub total_damage_taken: i64,
     pub vision_score: i64,
+    pub perk_primary_style: i64,
+    pub perk_sub_style: i64,
+    pub perk0: i64,
+    pub perk1: i64,
+    pub perk2: i64,
+    pub perk3: i64,
+    pub perk4: i64,
+    pub perk5: i64,
+    pub stat_perk0: i64,
+    pub stat_perk1: i64,
+    pub stat_perk2: i64,
+    pub largest_multi_kill: i64,
+    pub double_kills: i64,
+    pub triple_kills: i64,
+    pub quadra_kills: i64,
+    pub penta_kills: i64,
+    pub first_blood_kill: bool,
+    pub physical_damage_dealt_to_champions: i64,
+    pub magic_damage_dealt_to_champions: i64,
+    pub true_damage_dealt_to_champions: i64,
+    pub damage_self_mitigated: i64,
+    pub total_heal: i64,
+    pub damage_dealt_to_turrets: i64,
+    pub wards_placed: i64,
+    pub wards_killed: i64,
+    pub vision_wards_bought_in_game: i64,
+    pub time_c_cing_others: i64,
 }
 
 #[derive(Debug, Default, Deserialize)]

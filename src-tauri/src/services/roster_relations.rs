@@ -340,6 +340,9 @@ mod tests {
             position: String::new(),
             team_id: 100,
             vision_score: 10,
+            keystone: 0,
+            sub_style: 0,
+            largest_multi_kill: 0,
             metrics: None,
             participants,
         }
@@ -351,6 +354,7 @@ mod tests {
             out.push(GameParticipant {
                 puuid: (*puuid).to_owned(),
                 team_id,
+                champion_id: 0,
                 position: String::new(),
                 jungler: false,
             });

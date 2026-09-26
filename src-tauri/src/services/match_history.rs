@@ -76,6 +76,11 @@ pub struct GameSummary {
     pub position: String,
     pub team_id: i64,
     pub vision_score: i64,
+    /// Keystone rune and secondary rune tree; 0 when unknown.
+    pub keystone: i64,
+    pub sub_style: i64,
+    /// 2 = double kill ... 5 = penta kill.
+    pub largest_multi_kill: i64,
     /// Team-relative figures. Only SGP lists every participant, so LCU pages have none.
     pub metrics: Option<GameMetrics>,
     /// Everyone in the game (SGP only), for premade and "met before" detection.
@@ -105,6 +110,7 @@ pub struct GameMetrics {
 pub struct GameParticipant {
     pub puuid: String,
     pub team_id: i64,
+    pub champion_id: i64,
     /// `TOP`/`JUNGLE`/...; empty outside Summoner's Rift.
     pub position: String,
     /// Plays jungle (by position, or by carrying Smite).
@@ -274,6 +280,7 @@ fn sgp_summary(game: SgpGameJson, puuid: &str) -> Option<GameSummary> {
         .map(|p| GameParticipant {
             puuid: p.puuid.clone(),
             team_id: p.team_id,
+            champion_id: p.champion_id,
             position: p.team_position.clone(),
             jungler: p.team_position == "JUNGLE" || [p.spell1_id, p.spell2_id].contains(&SMITE),
         })
@@ -300,9 +307,18 @@ fn sgp_summary(game: SgpGameJson, puuid: &str) -> Option<GameSummary> {
         position: p.team_position.clone(),
         team_id: p.team_id,
         vision_score: p.vision_score,
+        keystone: keystone(p),
+        sub_style: p.perks.styles.get(1).map_or(0, |s| s.style),
+        largest_multi_kill: p.largest_multi_kill,
         metrics,
         participants,
     })
+}
+
+fn keystone(p: &SgpParticipant) -> i64 {
+    let primary = p.perks.styles.first();
+    let first = primary.and_then(|s| s.selections.first());
+    first.map_or(0, |s| s.perk)
 }
 
 fn sgp_metrics(all: &[SgpParticipant], me: &SgpParticipant) -> GameMetrics {
@@ -388,6 +404,9 @@ fn lcu_summary(game: LcuGame, puuid: &str) -> Option<GameSummary> {
         position: String::new(),
         team_id: p.team_id,
         vision_score: s.vision_score,
+        keystone: s.perk0,
+        sub_style: s.perk_sub_style,
+        largest_multi_kill: s.largest_multi_kill,
         metrics: None,
         participants: Vec::new(),
     })

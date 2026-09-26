@@ -9,7 +9,7 @@ use crate::services;
 use crate::services::auto_accept::Pending;
 use crate::services::champion_assist::{BuildVariant, ChampionBuild, MatchupReport, TierEntry};
 use crate::services::game_data::GameData;
-use crate::services::game_detail::GameDetail;
+use crate::services::game_detail::{GameDetail, PlayerBuild};
 use crate::services::match_history::MatchHistoryPage;
 use crate::services::player_profile::{PlayerProfile, ProfileContext};
 use crate::services::roster_insights::RosterInsights;
@@ -206,4 +206,11 @@ pub async fn champion_matchups(
     assist
         .matchups(&session, champion_id, &position, &enemies, &tier)
         .await
+}
+
+/// Item purchase and skill order of every player in one game, from the SGP timeline.
+#[tauri::command]
+pub async fn game_builds(state: State<'_, AppState>, game_id: i64) -> Result<Vec<PlayerBuild>> {
+    let session = state.session()?;
+    state.game_details.builds(&session, game_id).await
 }
