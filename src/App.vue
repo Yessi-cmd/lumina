@@ -37,6 +37,9 @@ const navItems: { to: string; label: string; icon: IconName }[] = [
 ];
 
 const pageTitle = computed(() => navItems.find((i) => i.to === route.path)?.label ?? "");
+/** Nav items are h-9 with a 2px gap; the highlight slides between them. */
+const NAV_PITCH = 38;
+const activeIndex = computed(() => navItems.findIndex((i) => i.to === route.path));
 
 const summoner = computed(() => lcu.snapshot.summoner);
 const summonerName = computed(() => {
@@ -79,18 +82,21 @@ onMounted(() => {
         </div>
       </div>
 
-      <nav class="mt-2 flex flex-col gap-0.5">
+      <nav class="relative mt-2 flex flex-col gap-0.5">
+        <div
+          class="pointer-events-none absolute inset-x-0 top-0 h-9 rounded-lg bg-white/[0.07] transition-[transform,opacity] duration-500 ease-out-expo"
+          :class="activeIndex < 0 && 'opacity-0'"
+          :style="{ transform: `translateY(${Math.max(activeIndex, 0) * NAV_PITCH}px)` }"
+        >
+          <span class="absolute top-1/2 left-0 h-4 w-[3px] -translate-y-1/2 rounded-full bg-amber-400" />
+        </div>
         <RouterLink
           v-for="item in navItems"
           :key="item.to"
           :to="item.to"
-          class="group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-100"
-          active-class="nav-active"
-          exact-active-class="nav-active"
+          class="relative flex h-9 items-center gap-3 rounded-lg px-3 text-sm text-zinc-400 transition-colors duration-200 hover:text-zinc-100"
+          exact-active-class="text-zinc-50!"
         >
-          <span
-            class="nav-indicator absolute top-1/2 left-0 h-4 w-[3px] -translate-y-1/2 rounded-full bg-amber-400 opacity-0 transition-opacity"
-          />
           <AppIcon :name="item.icon" :size="17" />
           {{ item.label }}
         </RouterLink>
@@ -123,23 +129,11 @@ onMounted(() => {
       <AutoAcceptBanner />
       <main class="min-w-0 flex-1 overflow-auto px-6 pt-2 pb-8">
         <RouterView v-slot="{ Component, route: current }">
-          <div :key="current.path" class="animate-fade-in">
-            <component :is="Component" />
-          </div>
+          <Transition name="page" mode="out-in">
+            <component :is="Component" :key="current.path" />
+          </Transition>
         </RouterView>
       </main>
     </div>
   </div>
 </template>
-
-<style scoped>
-@reference "./style.css";
-
-.nav-active {
-  @apply bg-white/[0.07] text-zinc-50;
-}
-
-.nav-active .nav-indicator {
-  @apply opacity-100;
-}
-</style>

@@ -33,6 +33,10 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "nat
 tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
 sysinfo = { version = "0.37", default-features = false, features = ["system"] }
 
+# Window placement of the League client, for the champ-select overlays.
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging"] }
+
 # https://v2.tauri.app/concept/size/#cargo-configuration
 [profile.release]
 codegen-units = 1

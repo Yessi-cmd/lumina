@@ -15,7 +15,7 @@ use crate::clients::lcu::ws::LcuSocket;
 use crate::clients::sgp::http::SgpClient;
 use crate::clients::sgp::servers;
 use crate::error::Result;
-use crate::services::{auto_accept, ongoing_game, panel_window};
+use crate::services::{auto_accept, draft, ongoing_game, overlay_window, panel_window};
 use crate::state::gameflow::PHASE_NONE;
 use crate::state::session::LcuSession;
 use crate::state::{AppState, ClientInfo, ConnectionStatus};
@@ -105,6 +105,8 @@ async fn run_session(app: &AppHandle, creds: &Credentials) -> Result<()> {
     let phase = phase.unwrap_or_else(|_| PHASE_NONE.to_owned());
     state.set_gameflow_phase(phase.clone());
     auto_accept::on_phase(app, &phase);
+    draft::on_phase(app, &phase);
+    overlay_window::on_phase(app, &phase);
     ongoing_game::load_initial(app, &phase).await;
     log::info!("connected to LCU on port {}", creds.port);
 
@@ -161,10 +163,14 @@ fn event_router(app: AppHandle) -> UriRouter {
             ongoing_game::on_phase(&phase_app, &phase);
             auto_accept::on_phase(&phase_app, &phase);
             panel_window::on_phase(&phase_app, &phase);
-            phase_app.state::<AppState>().set_gameflow_phase(phase);
+            phase_app.state::<AppState>().set_gameflow_phase(phase.clone());
+            // After the phase is stored: the overlays check it on every tick.
+            draft::on_phase(&phase_app, &phase);
+            overlay_window::on_phase(&phase_app, &phase);
         })
         .on(ongoing_game::CHAMP_SELECT_SESSION, move |event| {
             ongoing_game::on_champ_select(&champ_select_app, event);
+            draft::on_champ_select(&champ_select_app, event);
         })
         .on(ongoing_game::GAMEFLOW_SESSION, move |event| {
             ongoing_game::on_gameflow_session(&gameflow_app, event);

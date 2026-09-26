@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import type { GameResult, GameSummary } from "../../api";
 import { useGameDataStore } from "../../stores/gameData";
 import { formatDuration, kdaRatio, timeAgo } from "../../utils/format";
+import ExpandTransition from "../common/ExpandTransition.vue";
 import GameDetailPanel from "./GameDetailPanel.vue";
 
 const props = defineProps<{
@@ -58,8 +59,11 @@ const lineup = computed(() => {
 
 <template>
   <div
-    class="overflow-hidden rounded-lg border bg-zinc-900/70 transition-colors"
-    :class="[result.bg, expanded ? 'border-white/10' : 'border-white/[0.04] hover:border-white/10']"
+    class="overflow-hidden rounded-lg border bg-zinc-900/70 transition-[border-color,box-shadow] duration-300 ease-out-expo"
+    :class="[
+      result.bg,
+      expanded ? 'border-white/10 shadow-lg shadow-black/30' : 'border-white/[0.04] hover:border-white/10',
+    ]"
   >
     <div
       class="grid cursor-pointer grid-cols-[4px_6.5rem_2.75rem_1.25rem_1.25rem_7rem_7.5rem_minmax(0,1fr)_auto_7.5rem] items-center gap-x-2.5 py-1.5 pr-3 transition-colors hover:bg-white/[0.025]"
@@ -164,6 +168,8 @@ const lineup = computed(() => {
         </div>
       </div>
     </div>
-    <GameDetailPanel v-if="expanded" :game-id="game.gameId" :puuid="puuid" />
+    <ExpandTransition>
+      <GameDetailPanel v-if="expanded" :game-id="game.gameId" :puuid="puuid" />
+    </ExpandTransition>
   </div>
 </template>

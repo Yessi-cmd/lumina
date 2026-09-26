@@ -125,6 +125,28 @@ Lumina 把分析全部放到 Rust，并做了这些增强：
 - 一键应用：删除旧的 `Lumina` 前缀符文页后新建；页数已满时改写当前可编辑页。
   召唤师技能用 `PATCH /lol-champ-select/v1/session/my-selection`，保持玩家原来闪现所在的键位。
 
+### 3.3.5 选人阶段悬浮窗（`services/overlay_window.rs`、`services/client_window.rs`、`services/draft.rs`、`src/overlay/`）
+仿 Akari-Yessi 的 BP 悬浮窗，设置项 `champSelectOverlay`（默认开）。
+- 窗口：两个置顶窗口，无边框、透明、不可聚焦。不可聚焦（`focusable(false)`）是为了点它时不抢走客户端的键盘焦点。
+  `overlay-allies` 贴在客户端左侧，`overlay-enemies` 贴在右侧；客户端贴着屏幕边时，悬浮窗收回屏幕内。
+  每 250ms 用 Win32 `FindWindowW("RCLIENT")` + `GetWindowRect` 读客户端位置。只读窗口几何，不碰客户端进程。
+  客户端最小化或不在前台时隐藏。
+  布局按 720 高设计，前端用 CSS `zoom` 按客户端实际高度缩放，每行对齐客户端的五个席位。
+  悬浮窗与主窗口加载同一个页面，`main.ts` 按窗口 label 挂载 `OverlayApp`。
+  开启后，选人阶段不再把主窗口弹到前台，免得挡住客户端。
+- 左侧：名单中的队友按楼层排列。数据是 SGP `q_420` 最近 50 场单双排，展示常用英雄前 3（场次、胜率、场均 K/D/A）。
+- 右侧（`draft.rs`，推送 `overlay://draft`）：
+  - 分路推断：三个信号相乘。
+    - 英雄在各路的场次占比，取自 lolalytics 五个位置的榜单。
+    - 该玩家 ban 的英雄所在的分路，因为 ban 常针对自己这一路。
+    - 五人分路互斥：枚举所有不重复的分配，求每人每路的边际概率。
+    客户端给了 `assignedPosition` 时直接用。
+  - counter：取该英雄在推断分路的高分段对位数据。敌方英雄在误差之外输掉的对位排在前面，其次是其它劣势对位。
+    已 ban、已选的英雄会去掉。
+    我方该路已锁定时，改为显示我方英雄的对位胜率。
+    我方已经没有未完成的选人时（例如对方是最后一手），提示无法 counter。
+  - 选人状态没变的事件直接跳过。每次分析带一个递增编号，较慢的旧结果不会覆盖新的。
+
 ### 3.4 性能
 - 战绩请求并发上限 5（`tokio::sync::Semaphore`）。
 - LRU 缓存 `(puuid, 分页)`，TTL 5 分钟。

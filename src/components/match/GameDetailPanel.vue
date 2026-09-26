@@ -147,7 +147,7 @@ function purchaseGroups(build: PlayerBuild): { minute: number; items: number[] }
 </script>
 
 <template>
-  <div class="animate-fade-in border-t border-white/[0.06] bg-zinc-950/40 px-3 py-3" @click.stop>
+  <div class="border-t border-white/[0.06] bg-zinc-950/40 px-3 py-3" @click.stop>
     <div class="segmented mb-3">
       <button
         v-for="t in TABS"
@@ -163,6 +163,7 @@ function purchaseGroups(build: PlayerBuild): { minute: number; items: number[] }
       </span>
     </div>
 
+    <Transition name="fade" mode="out-in">
     <p v-if="error" class="text-xs text-red-400">{{ error }}</p>
     <p v-else-if="!detail" class="text-xs text-zinc-500">加载对局详情…</p>
 
@@ -403,5 +404,6 @@ function purchaseGroups(build: PlayerBuild): { minute: number; items: number[] }
         />
       </div>
     </div>
+    </Transition>
   </div>
 </template>

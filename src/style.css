@@ -21,7 +21,21 @@
   --color-zinc-900: #14171e;
   --color-zinc-950: #0b0d12;
 
-  --animate-fade-in: fade-in 0.18s ease-out;
+  /* Fast start, long soft landing: the curve behind most motion in the app. */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  --animate-fade-in: fade-in 0.3s var(--ease-out-expo);
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+
+  @keyframes shimmer {
+    from {
+      background-position: 100% 0;
+    }
+    to {
+      background-position: -100% 0;
+    }
+  }
 
   @keyframes fade-in {
     from {
@@ -37,6 +51,12 @@
 
 :root {
   color-scheme: dark;
+}
+
+/* Champ-select overlays: only their cards are drawn, the window itself is see-through. */
+html.overlay,
+html.overlay body {
+  background: transparent;
 }
 
 html,
@@ -88,7 +108,7 @@ body {
   }
 
   .btn {
-    @apply inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors duration-150 disabled:pointer-events-none disabled:opacity-40;
+    @apply inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-[color,background-color,border-color,box-shadow,transform] duration-200 ease-out-expo active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40;
   }
 
   .btn-primary {
@@ -125,7 +145,7 @@ body {
   }
 
   .segment {
-    @apply cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium text-zinc-400 transition-colors hover:text-zinc-100;
+    @apply cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium text-zinc-400 transition-[color,background-color,box-shadow] duration-200 ease-out-expo hover:text-zinc-100 active:scale-[0.96];
   }
 
   .segment-active {
@@ -140,7 +160,103 @@ body {
     @apply text-2xl font-semibold tracking-tight text-zinc-50;
   }
 
+  /* Placeholder while data loads. */
+  .skeleton {
+    @apply animate-shimmer rounded-md bg-[length:200%_100%];
+    background-image: linear-gradient(
+      90deg,
+      rgb(255 255 255 / 0.03) 25%,
+      rgb(255 255 255 / 0.08) 50%,
+      rgb(255 255 255 / 0.03) 75%
+    );
+  }
+
+  /* One player row of a champ-select overlay. */
+  .overlay-card {
+    @apply absolute right-1 left-0.5 overflow-hidden rounded-lg border border-white/10 bg-zinc-950/90 px-2 py-1 text-[11px] leading-tight text-zinc-100 shadow-lg shadow-black/50;
+  }
+
+  .overlay-card-right {
+    @apply right-0.5 left-1;
+  }
+
   .empty-state {
     @apply rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-zinc-500;
+  }
+}
+
+/* Route changes: the old page leaves quickly, the new one settles in. */
+.page-enter-active {
+  transition:
+    opacity 0.32s var(--ease-out-expo),
+    transform 0.32s var(--ease-out-expo);
+}
+.page-leave-active {
+  transition:
+    opacity 0.12s ease-in,
+    transform 0.12s ease-in;
+}
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+/* Content swaps inside a page (tabs, loading to loaded). */
+.fade-enter-active {
+  transition: opacity 0.22s var(--ease-out-expo);
+}
+.fade-leave-active {
+  transition: opacity 0.1s ease-in;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* Lists: new items rise in, staggered with an inline transition-delay; removed items
+   go at once so the rest never jump around a fading gap. */
+.list-enter-active {
+  transition:
+    opacity 0.4s var(--ease-out-expo),
+    transform 0.4s var(--ease-out-expo);
+}
+.list-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.list-move {
+  transition: transform 0.35s var(--ease-out-expo);
+}
+
+/* Overlay rows slide out from the client. */
+.overlay-row-enter-active {
+  transition:
+    opacity 0.35s var(--ease-out-expo),
+    transform 0.35s var(--ease-out-expo);
+}
+.overlay-row-leave-active {
+  transition: opacity 0.15s ease-in;
+}
+.overlay-row-enter-from {
+  opacity: 0;
+  transform: translateX(12px);
+}
+.overlay-card-right.overlay-row-enter-from {
+  transform: translateX(-12px);
+}
+.overlay-row-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }

@@ -81,6 +81,19 @@ function onDelayInput(event: Event) {
               @update:model-value="store.update({ autoShowPanel: $event })"
             />
           </div>
+
+          <div class="flex items-center justify-between gap-6 p-4">
+            <div>
+              <div class="font-medium text-zinc-100">选人阶段悬浮窗</div>
+              <div class="mt-0.5 text-sm text-zinc-400">
+                英雄选择时贴在客户端两侧：左边是队友近期单双排的常用英雄，右边是敌方已选英雄的分路推断和 counter 建议。开启后选人阶段不再弹出主窗口，免得挡住客户端。
+              </div>
+            </div>
+            <ToggleSwitch
+              :model-value="s.champSelectOverlay"
+              @update:model-value="store.update({ champSelectOverlay: $event })"
+            />
+          </div>
         </div>
       </div>
 

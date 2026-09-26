@@ -26,8 +26,11 @@ pub fn on_phase(app: &AppHandle, phase: &str) {
     let Some(window) = app.get_webview_window(MAIN_WINDOW) else {
         return;
     };
+    // The champ-select overlays sit beside the client and hide whenever the client is
+    // not in front, so raising the main window then would hide them.
+    let overlays = app.state::<AppState>().settings().champ_select_overlay;
     match phase {
-        "ChampSelect" => raise(&window),
+        "ChampSelect" if !overlays => raise(&window),
         "GameStart" => pin_during_loading(app, window),
         _ => {}
     }

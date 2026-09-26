@@ -28,6 +28,9 @@ pub struct Settings {
     pub stats_tier: String,
     /// Rank filter for matchups (counters), one of `MATCHUP_TIERS`.
     pub matchup_tier: String,
+    /// Overlays beside the client during champ select: teammates' champions and counters
+    /// to the enemy picks.
+    pub champ_select_overlay: bool,
 }
 
 impl Default for Settings {
@@ -38,6 +41,7 @@ impl Default for Settings {
             auto_show_panel: true,
             stats_tier: DEFAULT_STATS_TIER.to_owned(),
             matchup_tier: DEFAULT_MATCHUP_TIER.to_owned(),
+            champ_select_overlay: true,
         }
     }
 }

@@ -29,6 +29,8 @@ const MIN_MATCHUP_GAMES: i64 = 200;
 /// Two-sided 95% confidence.
 const Z_95: f64 = 1.96;
 const MATCHUP_LIST_LEN: usize = 5;
+/// Positions in lolalytics' lane order, as used by `lane_shares`.
+pub const POSITIONS: [&str; 5] = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"];
 const TIER_LABELS: [&str; 15] = [
     "S+", "S", "S-", "A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-",
 ];
@@ -162,23 +164,42 @@ impl ChampionAssist {
         position: &str,
         tier: &str,
     ) -> Result<Vec<TierEntry>> {
-        let lane = lane(position)?;
-        let key = format!("{lane}:{tier}");
-        let mut entries = match cached(&self.tier_lists, &key) {
-            Some(entries) => entries,
-            None => {
-                let list = self.client()?.tier_list(lane, tier).await?;
-                let entries = ranked_entries(list);
-                store(&self.tier_lists, key, entries.clone());
-                entries
-            }
-        };
-
+        let mut entries = self.lane_entries(position, tier).await?;
         let owned = owned_champions(session).await;
         for entry in &mut entries {
             entry.owned = owned.contains(&entry.champion_id);
         }
         Ok(entries)
+    }
+
+    async fn lane_entries(&self, position: &str, tier: &str) -> Result<Vec<TierEntry>> {
+        let lane = lane(position)?;
+        let key = format!("{lane}:{tier}");
+        if let Some(entries) = cached(&self.tier_lists, &key) {
+            return Ok(entries);
+        }
+        let list = self.client()?.tier_list(lane, tier).await?;
+        let entries = ranked_entries(list);
+        store(&self.tier_lists, key, entries.clone());
+        Ok(entries)
+    }
+
+    /// Share of each champion's games played in each of `POSITIONS`, from the five lane
+    /// tier lists. Every game has one player per lane, so games compare across lanes.
+    pub async fn lane_shares(&self, tier: &str) -> Result<HashMap<i64, [f64; 5]>> {
+        let mut games: HashMap<i64, [f64; 5]> = HashMap::new();
+        for (i, position) in POSITIONS.iter().enumerate() {
+            for entry in self.lane_entries(position, tier).await? {
+                games.entry(entry.champion_id).or_default()[i] = entry.games as f64;
+            }
+        }
+        for row in games.values_mut() {
+            let total: f64 = row.iter().sum();
+            if total > 0.0 {
+                row.iter_mut().for_each(|g| *g /= total);
+            }
+        }
+        Ok(games)
     }
 
     pub async fn build(
@@ -209,19 +230,28 @@ impl ChampionAssist {
         enemies: &[i64],
         tier: &str,
     ) -> Result<MatchupReport> {
+        let rows = self.matchup_rows(session, champion_id, position, tier).await?;
+        Ok(report(&rows, enemies, position, tier))
+    }
+
+    /// Every same-lane opponent of one champion, from that champion's point of view.
+    pub async fn matchup_rows(
+        &self,
+        session: &LcuSession,
+        champion_id: i64,
+        position: &str,
+        tier: &str,
+    ) -> Result<Vec<Matchup>> {
         let lane = lane(position)?;
         let key = format!("{champion_id}:{lane}:{tier}");
-        let rows = match cached(&self.matchups, &key) {
-            Some(rows) => rows,
-            None => {
-                let alias = self.alias(session, champion_id).await?;
-                let list = self.client()?.counters(&alias, lane, tier).await?;
-                let rows: Vec<Matchup> = list.counters.into_iter().map(judge).collect();
-                store(&self.matchups, key, rows.clone());
-                rows
-            }
-        };
-        Ok(report(&rows, enemies, position, tier))
+        if let Some(rows) = cached(&self.matchups, &key) {
+            return Ok(rows);
+        }
+        let alias = self.alias(session, champion_id).await?;
+        let list = self.client()?.counters(&alias, lane, tier).await?;
+        let rows: Vec<Matchup> = list.counters.into_iter().map(judge).collect();
+        store(&self.matchups, key, rows.clone());
+        Ok(rows)
     }
 
     async fn alias(&self, session: &LcuSession, champion_id: i64) -> Result<String> {

@@ -10,8 +10,10 @@ use crate::services::auto_accept::Pending;
 use crate::services::champion_assist::{BuildVariant, ChampionBuild, MatchupReport, TierEntry};
 use crate::services::game_data::GameData;
 use crate::services::game_detail::{GameDetail, PlayerBuild};
+use crate::services::draft::Draft;
 use crate::services::match_history::MatchHistoryPage;
 use crate::services::player_profile::{PlayerProfile, ProfileContext};
+use crate::services::ranked_champions::RankedChampions;
 use crate::services::roster_insights::RosterInsights;
 use crate::state::ongoing::Roster;
 use crate::state::{AppState, LcuSnapshot};
@@ -126,7 +128,27 @@ pub fn save_settings(
     if !saved.auto_accept {
         services::auto_accept::cancel(&app);
     }
+    let phase = state.lcu_snapshot().gameflow_phase;
+    services::draft::on_phase(&app, &phase);
+    services::overlay_window::on_phase(&app, &phase);
     Ok(saved)
+}
+
+/// Enemy lanes and counter picks in the current champ select; later changes arrive as
+/// `overlay://draft` events.
+#[tauri::command]
+pub fn draft_state() -> Option<Draft> {
+    services::draft::latest()
+}
+
+/// A teammate's most played champions in recent solo/duo games.
+#[tauri::command]
+pub async fn ranked_champions(
+    state: State<'_, AppState>,
+    puuid: String,
+) -> Result<RankedChampions> {
+    let session = state.session()?;
+    services::ranked_champions::load(&state.match_history, &session, &puuid).await
 }
 
 /// Pending auto accept; later changes arrive as `auto-accept://state` events.

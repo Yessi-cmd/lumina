@@ -270,16 +270,17 @@ watch(
 
     <p v-if="error" class="text-sm break-all text-red-400">{{ error }}</p>
 
-    <div class="flex flex-col gap-1.5">
+    <TransitionGroup name="list" tag="div" class="flex flex-col gap-1.5">
       <MatchRow
-        v-for="game in shown"
+        v-for="(game, i) in shown"
         :key="game.gameId"
         :game="game"
         :puuid="summoner?.puuid ?? ''"
+        :style="{ transitionDelay: `${Math.min(i % PAGE_SIZE, 12) * 25}ms` }"
       />
-      <template v-if="loading && games.length === 0">
-        <div v-for="i in 6" :key="i" class="h-14 animate-pulse rounded-lg bg-white/[0.03]" />
-      </template>
+    </TransitionGroup>
+    <div v-if="loading && games.length === 0" class="flex flex-col gap-1.5">
+      <div v-for="i in 6" :key="i" class="skeleton h-14 rounded-lg" />
     </div>
 
     <p v-if="summoner && !loading && shown.length === 0 && !error" class="empty-state">

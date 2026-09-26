@@ -68,10 +68,11 @@ function championOf(puuid: string): number {
     </p>
 
     <template v-else>
-      <div v-if="insights?.advice.length" class="grid grid-cols-2 gap-2">
+      <TransitionGroup v-if="insights?.advice.length" name="list" tag="div" class="grid grid-cols-2 gap-2" appear>
         <div
           v-for="(a, i) in insights.advice"
-          :key="i"
+          :key="a.title + a.puuid"
+          :style="{ transitionDelay: `${i * 50}ms` }"
           class="flex items-start gap-3 rounded-xl border p-3"
           :class="ADVICE_TONE[a.tone]"
         >
@@ -85,7 +86,7 @@ function championOf(puuid: string): number {
             <div class="text-xs leading-5 text-zinc-400">{{ a.detail }}</div>
           </div>
         </div>
-      </div>
+      </TransitionGroup>
       <p v-else-if="!insights" class="flex items-center gap-2 text-xs text-zinc-500">
         <span class="size-3 animate-spin rounded-full border-2 border-zinc-600 border-t-amber-400" />
         正在分析双方战绩与对线数据…

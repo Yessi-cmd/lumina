@@ -380,6 +380,58 @@ export interface Settings {
   statsTier: string;
   /** Rank filter for matchups: emerald_plus / diamond_plus / master_plus. */
   matchupTier: string;
+  /** Overlays beside the client during champ select. */
+  champSelectOverlay: boolean;
+}
+
+/** A teammate's most played champions in recent solo/duo games. */
+export interface RankedChampions {
+  games: number;
+  wins: number;
+  avgKills: number;
+  avgDeaths: number;
+  avgAssists: number;
+  champions: {
+    championId: number;
+    games: number;
+    wins: number;
+    avgKills: number;
+    avgDeaths: number;
+    avgAssists: number;
+  }[];
+}
+
+export interface CounterPick {
+  championId: number;
+  /** The counter's win rate against the enemy champion, percent. */
+  winRate: number;
+  games: number;
+  /** Beyond the 95% margin of error. */
+  significant: boolean;
+}
+
+export type DraftAdvice =
+  | { kind: "waiting" }
+  | { kind: "loading" }
+  | { kind: "noPicksLeft" }
+  | { kind: "allyLocked"; allyChampionId: number; winRate: number | null; games: number }
+  | { kind: "counters"; allyFloor: number | null; picks: CounterPick[] }
+  | { kind: "unavailable"; reason: string };
+
+export interface EnemySlot {
+  /** Pick order within the enemy team, from 1. */
+  floor: number;
+  /** 0 until locked in. */
+  championId: number;
+  bans: number[];
+  /** Every lane with its probability, most likely first. */
+  lanes: { position: string; probability: number }[];
+  advice: DraftAdvice;
+}
+
+export interface Draft {
+  gameId: number;
+  enemies: EnemySlot[];
 }
 
 export interface PendingAccept {
@@ -417,6 +469,8 @@ export const api = {
   saveSettings: (settings: Settings) => invoke<Settings>("save_settings", { settings }),
   autoAcceptState: () => invoke<PendingAccept | null>("auto_accept_state"),
   cancelAutoAccept: () => invoke<void>("cancel_auto_accept"),
+  draftState: () => invoke<Draft | null>("draft_state"),
+  rankedChampions: (puuid: string) => invoke<RankedChampions>("ranked_champions", { puuid }),
   logDir: () => invoke<string>("log_dir"),
   openLogDir: () => invoke<void>("open_log_dir"),
   logFrontend: (level: "info" | "warn" | "error", message: string) =>
@@ -437,4 +491,6 @@ export const events = {
     listen<PendingAccept | null>("auto-accept://state", (e) => cb(e.payload)),
   onGameflowPhase: (cb: (c: PhaseChange) => void): Promise<UnlistenFn> =>
     listen<PhaseChange>("lcu://gameflow-phase", (e) => cb(e.payload)),
+  onDraft: (cb: (d: Draft | null) => void): Promise<UnlistenFn> =>
+    listen<Draft | null>("overlay://draft", (e) => cb(e.payload)),
 };
