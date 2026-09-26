@@ -4,4 +4,5 @@ pub mod discovery;
 pub mod events;
 pub mod http;
 pub mod models;
+pub mod puuid;
 pub mod ws;

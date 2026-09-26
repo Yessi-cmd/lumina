@@ -105,7 +105,7 @@ function championOf(puuid: string): number {
                 匿名队友
                 <span v-if="POSITIONS[a.position]" class="ml-1 text-xs text-zinc-500">{{ POSITIONS[a.position] }}</span>
               </div>
-              <div class="text-xs text-zinc-500">选人阶段开启了匿名，进入加载界面后客户端会公开身份，届时自动显示战绩。</div>
+              <div class="text-xs text-zinc-500">暂时无法解析该玩家身份，获取到有效身份后会自动显示战绩。</div>
             </div>
           </div>
         </div>

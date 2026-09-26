@@ -27,11 +27,10 @@ pub struct Roster {
     /// 0 when unknown (champ select does not say).
     pub queue_id: i64,
     pub allies: Vec<RosterPlayer>,
-    /// Teammates who chose to stay anonymous in champ select. The client names them once
-    /// the game loads; until then only their champion and position are known.
+    /// Hidden teammates whose obfuscated PUUID is absent or cannot be resolved.
     pub anonymous_allies: Vec<AnonymousPlayer>,
     pub enemies: Vec<RosterPlayer>,
-    /// Opponents the client does not identify; during champ select that is all of them.
+    /// Opponents whose identity cannot be resolved from the client payload.
     pub hidden_enemies: usize,
     /// Champions the opponents have locked, even when their identities are hidden.
     pub enemy_champions: Vec<i64>,

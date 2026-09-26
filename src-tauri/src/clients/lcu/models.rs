@@ -244,6 +244,7 @@ pub struct ChampSelectSession {
 pub struct ChampSelectMember {
     pub cell_id: i64,
     pub puuid: String,
+    pub obfuscated_puuid: String,
     pub champion_id: i64,
     pub champion_pick_intent: i64,
     pub assigned_position: String,

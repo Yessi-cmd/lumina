@@ -210,7 +210,7 @@ export interface Roster {
   /** 0 when unknown (champ select does not say). */
   queueId: number;
   allies: RosterPlayer[];
-  /** Teammates anonymous in champ select; named by the client once the game loads. */
+  /** Hidden teammates whose obfuscated PUUID is absent or cannot be resolved. */
   anonymousAllies: AnonymousPlayer[];
   enemies: RosterPlayer[];
   /** Opponents the client does not identify; during champ select that is all of them. */

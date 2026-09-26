@@ -1,6 +1,6 @@
-//! Who is in the current game. Party members come from the lobby, teammates from champ
-//! select; opponents are hidden there on the Chinese servers (and in ranked elsewhere),
-//! so they appear only once `/lol-gameflow/v1/session` lists both teams at GameStart.
+//! Current players from lobby, champ select and gameflow. Hidden champ-select members
+//! are resolved when the client supplies a usable obfuscated PUUID; otherwise they
+//! remain placeholders until the client exposes their identity.
 
 use tauri::{AppHandle, Manager};
 
@@ -8,6 +8,7 @@ use crate::clients::lcu::models::{
     ChampSelectMember, ChampSelectSession, GameflowPlayer, GameflowSession, LcuEvent, LcuEventType,
     LobbySession,
 };
+use crate::clients::lcu::puuid::decrypt_puuid;
 use crate::state::ongoing::{AnonymousPlayer, Roster, RosterPlayer, RosterStage};
 use crate::state::AppState;
 
@@ -241,15 +242,14 @@ fn from_champ_select(session: ChampSelectSession) -> Roster {
     let mut allies = Vec::new();
     let mut anonymous_allies = Vec::new();
     for member in session.my_team {
-        // Anonymous by their own choice: show the seat, not who sits in it.
-        if member.name_visibility_type == "HIDDEN" && member.cell_id != local {
+        if let Some(player) = champ_select_player(&member, local) {
+            allies.push(player);
+        } else if member.name_visibility_type == "HIDDEN" {
             anonymous_allies.push(AnonymousPlayer {
                 champion_id: picked_champion(&member),
                 position: member.assigned_position.to_uppercase(),
             });
-            continue;
         }
-        allies.extend(champ_select_player(member, local));
     }
     let mut enemies = Vec::new();
     let mut hidden_enemies = 0;
@@ -258,7 +258,7 @@ fn from_champ_select(session: ChampSelectSession) -> Roster {
         if member.champion_id > 0 {
             enemy_champions.push(member.champion_id);
         }
-        match champ_select_player(member, local) {
+        match champ_select_player(&member, local) {
             Some(player) => enemies.push(player),
             None => hidden_enemies += 1,
         }
@@ -275,13 +275,17 @@ fn from_champ_select(session: ChampSelectSession) -> Roster {
     }
 }
 
-fn champ_select_player(member: ChampSelectMember, local_cell: i64) -> Option<RosterPlayer> {
-    if member.name_visibility_type == "HIDDEN" || !is_known(&member.puuid) {
+fn champ_select_player(member: &ChampSelectMember, local_cell: i64) -> Option<RosterPlayer> {
+    let puuid = if member.name_visibility_type == "HIDDEN" {
+        decrypt_puuid(&member.obfuscated_puuid)?
+    } else if is_known(&member.puuid) {
+        member.puuid.clone()
+    } else {
         return None;
-    }
+    };
     Some(RosterPlayer {
-        champion_id: picked_champion(&member),
-        puuid: member.puuid,
+        champion_id: picked_champion(member),
+        puuid,
         position: member.assigned_position.to_uppercase(),
         is_self: member.cell_id == local_cell,
     })
@@ -378,6 +382,44 @@ mod tests {
         assert_eq!(roster.anonymous_allies[0].position, "UTILITY");
         assert!(roster.enemies.is_empty());
         assert_eq!(roster.hidden_enemies, 2);
+    }
+
+    #[test]
+    fn champ_select_resolves_hidden_members_and_preserves_missing_seats() {
+        let session = serde_json::from_value(serde_json::json!({
+            "localPlayerCellId": 1,
+            "myTeam": [
+                {"cellId": 1, "puuid": "me", "nameVisibilityType": "VISIBLE",
+                 "obfuscatedPuuid": "906167b8-d673-63a8-d1dc-3d469bc442b2"},
+                {"cellId": 2, "puuid": "ignored", "nameVisibilityType": "HIDDEN",
+                 "obfuscatedPuuid": "906167b8-d673-63a8-d1dc-3d469bc442b2",
+                 "championPickIntent": 64, "assignedPosition": "jungle"},
+                {"cellId": 3, "nameVisibilityType": "HIDDEN",
+                 "obfuscatedPuuid": "invalid", "championId": 412}
+            ],
+            "theirTeam": [
+                {"cellId": 5, "nameVisibilityType": "HIDDEN",
+                 "obfuscatedPuuid": "906167b8-d673-63a8-d1dc-3d469bc442b2",
+                 "championId": 103, "assignedPosition": "middle"},
+                {"cellId": 6, "nameVisibilityType": "HIDDEN", "championId": 99}
+            ]
+        }))
+        .unwrap();
+        let roster = from_champ_select(session);
+        assert_eq!(roster.allies.len(), 2);
+        assert_eq!(roster.allies[0].puuid, "me");
+        assert!(roster.allies[0].is_self);
+        assert_eq!(roster.allies[1].puuid, "11111111-2222-3333-4444-555555555555");
+        assert_eq!(roster.allies[1].position, "JUNGLE");
+        assert_eq!(roster.allies[1].champion_id, 64);
+        assert!(!roster.allies[1].is_self);
+        assert_eq!(roster.anonymous_allies.len(), 1);
+        assert_eq!(roster.anonymous_allies[0].champion_id, 412);
+        assert_eq!(roster.enemies.len(), 1);
+        assert_eq!(roster.enemies[0].puuid, roster.allies[1].puuid);
+        assert_eq!(roster.enemies[0].position, "MIDDLE");
+        assert_eq!(roster.hidden_enemies, 1);
+        assert_eq!(roster.enemy_champions, vec![103, 99]);
     }
 
     #[test]

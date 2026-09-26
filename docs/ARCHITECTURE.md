@@ -68,10 +68,11 @@
 - `GameStart` / `InProgress` → 10 人名单
 
 ### 3.3.1 对局名单（M4）
-- 选人阶段：`/lol-champ-select/v1/session` 的 `myTeam`。敌方 `nameVisibilityType` 为 `HIDDEN`，
-  国服 `obfuscatedPuuid` 也为空，BP 阶段拿不到敌方身份（Akari 同样拿不到），不做反匿名。
-  队友主动开启匿名时同样 `HIDDEN`：只显示英雄和位置（`Roster.anonymousAllies`），不解密
-  `obfuscatedPuuid`；进入加载界面后客户端公开身份，再正常查战绩。
+- 选人阶段：读取 `/lol-champ-select/v1/session` 的 `myTeam/theirTeam`。
+  `nameVisibilityType` 为 `HIDDEN` 时，在 Rust `clients/lcu/puuid.rs` 中按 Akari-Yessi
+  的固定 16 字节 XOR 掩码解析 `obfuscatedPuuid`，恢复的 PUUID 进入正常名单及战绩预取流程。
+  可见玩家直接使用原始 `puuid`；匿名标识缺失、格式错误或为空 UUID 时保留匿名队友占位或敌方隐藏计数，
+  后续客户端提供有效身份时自动更新。
 - 加载阶段：`/lol-gameflow/v1/session` 的 `gameData.teamOne/teamTwo` 出现双方 puuid，按自己所在队伍分我方/敌方。
 - 名单变化时 emit `ongoing://roster`，并对新出现的 puuid 预取第一页战绩（20 场）进缓存；
   前端卡片请求同一页，基本直接命中缓存。进入 `None/Lobby/Matchmaking/ReadyCheck` 时清空名单。
