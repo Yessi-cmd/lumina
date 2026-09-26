@@ -68,7 +68,9 @@ impl LolalyticsClient {
         let value: Value = serde_json::from_str(&text)
             .map_err(|_| AppError::Message("lolalytics 返回了无效数据".to_owned()))?;
         if value.get("status").is_some() {
-            return Err(AppError::Message("lolalytics 没有这个英雄的数据".to_owned()));
+            return Err(AppError::Message(
+                "lolalytics 没有这个英雄的数据".to_owned(),
+            ));
         }
         let parsed = serde_json::from_value(value);
         parsed.map_err(|err| AppError::Message(err.to_string()))

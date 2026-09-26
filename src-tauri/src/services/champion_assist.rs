@@ -196,7 +196,9 @@ async fn apply_runes(session: &LcuSession, title: &str, page: &RunePage) -> Resu
         log::info!("creating a rune page failed ({err}); overwriting the current page");
         let current: LcuPerkPage = http.get(CURRENT_PERK_PAGE).await?;
         if !current.is_editable {
-            return Err(AppError::Message("符文页已满，且当前符文页不可编辑".to_owned()));
+            return Err(AppError::Message(
+                "符文页已满，且当前符文页不可编辑".to_owned(),
+            ));
         }
         let path = format!("{PERK_PAGES}/{}", current.id);
         http.send_json(Method::PUT, &path, Some(&body)).await?;
@@ -213,7 +215,8 @@ async fn apply_spells(session: &LcuSession, first: i64, second: i64) -> Result<(
     let flash_on_f = me.is_some_and(|m| m.spell2_id == FLASH);
     let (d, f) = order_spells(first, second, flash_on_f);
     let body = json!({ "spell1Id": d, "spell2Id": f });
-    http.send_json(Method::PATCH, MY_SELECTION, Some(&body)).await
+    http.send_json(Method::PATCH, MY_SELECTION, Some(&body))
+        .await
 }
 
 /// Keeps Flash on F for players who already have it there.
