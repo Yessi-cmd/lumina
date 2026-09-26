@@ -62,12 +62,6 @@ pub fn on_phase(app: &AppHandle, phase: &str) {
     tauri::async_runtime::spawn(follow_client(app.clone()));
 }
 
-/// Applies the setting right away instead of at the next champ select.
-pub fn on_settings_changed(app: &AppHandle) {
-    let phase = app.state::<AppState>().lcu_snapshot().gameflow_phase;
-    on_phase(app, &phase);
-}
-
 fn enabled(app: &AppHandle) -> bool {
     app.state::<AppState>().settings().champ_select_overlay
 }

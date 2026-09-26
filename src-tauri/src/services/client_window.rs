@@ -12,10 +12,6 @@ pub struct Rect {
 }
 
 impl Rect {
-    pub fn width(&self) -> i32 {
-        self.right - self.left
-    }
-
     pub fn height(&self) -> i32 {
         self.bottom - self.top
     }
