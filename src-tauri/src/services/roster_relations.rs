@@ -310,6 +310,7 @@ mod tests {
             game_id: 999,
             queue_id: 420,
             allies: ["me", "a1", "a2"].map(player).to_vec(),
+            anonymous_allies: Vec::new(),
             enemies: ["e1", "e2"].map(player).to_vec(),
             hidden_enemies: 0,
             enemy_champions: Vec::new(),

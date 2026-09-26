@@ -1,6 +1,6 @@
 [package]
 name = "lumina"
-version = "0.1.6"
+version = "0.1.7"
 description = "A lightweight League of Legends companion built on the LCU and SGP APIs"
 authors = ["Yessi-cmd"]
 license = "MIT"

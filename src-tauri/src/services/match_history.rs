@@ -122,6 +122,8 @@ struct PageRequest {
     puuid: String,
     start: u32,
     count: u32,
+    /// Only games from this queue.
+    queue: Option<i64>,
 }
 
 impl PageRequest {
@@ -164,10 +166,24 @@ impl MatchHistoryService {
         start: u32,
         count: u32,
     ) -> Result<MatchHistoryPage> {
+        self.get_queue(session, puuid, start, count, None).await
+    }
+
+    /// Like `get`, only games from `queue` when given. SGP filters on the server, so
+    /// pages stay full; LCU pages are filtered afterwards and may come back short.
+    pub async fn get_queue(
+        &self,
+        session: &LcuSession,
+        puuid: &str,
+        start: u32,
+        count: u32,
+        queue: Option<i64>,
+    ) -> Result<MatchHistoryPage> {
         let req = PageRequest {
             puuid: puuid.to_owned(),
             start,
             count: count.clamp(1, MAX_PAGE_SIZE),
+            queue,
         };
         if let Some(page) = self.cached(&req) {
             return Ok(page);
@@ -235,7 +251,7 @@ async fn fetch_sgp(
 ) -> Result<Vec<GameSummary>> {
     let token = entitlements_token(session).await?;
     let history = sgp
-        .match_history(&token, &req.puuid, req.start, req.count)
+        .match_history(&token, &req.puuid, req.start, req.count, req.queue)
         .await?;
 
     let mut games = Vec::new();
@@ -255,6 +271,9 @@ async fn fetch_lcu(session: &LcuSession, req: &PageRequest) -> Result<Vec<GameSu
     let mut games = Vec::new();
     for game in history.games.games {
         games.extend(lcu_summary(game, puuid));
+    }
+    if let Some(queue) = req.queue {
+        games.retain(|g| g.queue_id == queue);
     }
     games.sort_by_key(|g| std::cmp::Reverse(g.created_at));
     Ok(games)

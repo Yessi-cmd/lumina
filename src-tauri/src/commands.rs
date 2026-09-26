@@ -59,11 +59,12 @@ pub async fn match_history(
     puuid: String,
     start: u32,
     count: u32,
+    queue: Option<i64>,
 ) -> Result<MatchHistoryPage> {
     let session = state.session()?;
     state
         .match_history
-        .get(&session, &puuid, start, count)
+        .get_queue(&session, &puuid, start, count, queue)
         .await
 }
 

@@ -30,7 +30,7 @@ pub struct EarlyGame {
 /// Early game of everyone in one match, keyed by puuid.
 pub type GameDigest = HashMap<String, EarlyGame>;
 
-/// A player's early game averaged over their recent Rift games.
+/// A player's early game averaged over their recent ranked games.
 #[derive(Debug, Clone, Default)]
 pub struct EarlyStats {
     pub gank_games: usize,

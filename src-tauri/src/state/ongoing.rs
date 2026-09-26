@@ -27,6 +27,9 @@ pub struct Roster {
     /// 0 when unknown (champ select does not say).
     pub queue_id: i64,
     pub allies: Vec<RosterPlayer>,
+    /// Teammates who chose to stay anonymous in champ select. The client names them once
+    /// the game loads; until then only their champion and position are known.
+    pub anonymous_allies: Vec<AnonymousPlayer>,
     pub enemies: Vec<RosterPlayer>,
     /// Opponents the client does not identify; during champ select that is all of them.
     pub hidden_enemies: usize,
@@ -43,6 +46,14 @@ pub struct RosterPlayer {
     /// `TOP`/`JUNGLE`/`MIDDLE`/`BOTTOM`/`UTILITY`; empty outside role queues.
     pub position: String,
     pub is_self: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnonymousPlayer {
+    /// Locked or hovered champion; 0 when none yet.
+    pub champion_id: i64,
+    pub position: String,
 }
 
 impl Roster {
@@ -100,6 +111,7 @@ mod tests {
             game_id: 1,
             queue_id: 0,
             allies,
+            anonymous_allies: Vec::new(),
             enemies: Vec::new(),
             hidden_enemies: 0,
             enemy_champions: Vec::new(),

@@ -49,6 +49,12 @@ mod limits {
     pub const GOOD_CS_PER_MINUTE: f64 = 8.0;
     pub const POOR_CS_PER_MINUTE: f64 = 5.0;
     pub const METRIC_MIN_GAMES: usize = 3;
+    /// Ranked form: a game this many ranked games back weighs half as much as the latest.
+    pub const FORM_HALF_LIFE: f64 = 6.0;
+    /// Ranked form: weight of a game played off the player's current position.
+    pub const OFF_ROLE_WEIGHT: f64 = 0.3;
+    /// Deaths per 10 minutes of an average ranked player.
+    pub const DEATHS_PER_10: f64 = 2.0;
 }
 
 const RANKED_QUEUES: [i64; 2] = [420, 440];
@@ -134,6 +140,22 @@ pub struct PlayerProfile {
     /// Position used for baselines: the current assignment, else the most played one.
     pub position: String,
     pub tags: Vec<PlayerTag>,
+    /// Input to the power index; `None` without solo/duo or flex games.
+    #[serde(skip)]
+    pub form: Option<RankedForm>,
+}
+
+/// Solo/duo and flex games only, recent games and games on the current position
+/// weighted most. Normal, ARAM and bot games say little about how someone plays ranked.
+#[derive(Debug, Clone)]
+pub struct RankedForm {
+    pub games: usize,
+    pub off_role_games: usize,
+    /// Sum of game weights, and of the weights of the games won.
+    pub weight: f64,
+    pub wins: f64,
+    /// -1..1 against the average player on the same position; `None` without SGP data.
+    pub performance: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -230,6 +252,7 @@ pub fn build(page: &MatchHistoryPage, ctx: &ProfileContext) -> PlayerProfile {
         top_champions: top_champions(&counted),
         position,
         tags,
+        form: ranked_form(&counted, &ctx.position),
     }
 }
 
@@ -652,6 +675,65 @@ fn akari_score(
     })
 }
 
+fn ranked_form(counted: &[&GameSummary], position: &str) -> Option<RankedForm> {
+    let mut ranked = Vec::new();
+    for game in counted {
+        if is_ranked(game) {
+            ranked.push(*game);
+        }
+    }
+    if ranked.is_empty() {
+        return None;
+    }
+    let role = match position {
+        "" => main_position(&ranked),
+        _ => position.to_owned(),
+    };
+    let mut form = RankedForm {
+        games: ranked.len(),
+        off_role_games: 0,
+        weight: 0.0,
+        wins: 0.0,
+        performance: None,
+    };
+    let (mut rated, mut performance) = (0.0, 0.0);
+    for (i, game) in ranked.iter().enumerate() {
+        let mut weight = 0.5_f64.powf(i as f64 / limits::FORM_HALF_LIFE);
+        let off_role = !role.is_empty() && !game.position.is_empty() && game.position != role;
+        if off_role {
+            form.off_role_games += 1;
+            weight *= limits::OFF_ROLE_WEIGHT;
+        }
+        form.weight += weight;
+        if game.result == GameResult::Win {
+            form.wins += weight;
+        }
+        if let Some(m) = &game.metrics {
+            rated += weight;
+            performance += weight * game_performance(game, m);
+        }
+    }
+    if rated > 0.0 {
+        form.performance = Some(performance / rated);
+    }
+    Some(form)
+}
+
+/// One game against the average player on the same position. Each part stays within ±1,
+/// so one stat-padded game cannot carry the average, and kills and assists count through
+/// kill participation rather than KDA.
+fn game_performance(game: &GameSummary, m: &GameMetrics) -> f64 {
+    let unit = |v: f64| v.clamp(-1.0, 1.0);
+    let deaths_per_10 = game.deaths as f64 * 10.0 / minutes(game);
+    let deaths = unit((limits::DEATHS_PER_10 - deaths_per_10) / 1.2);
+    let participation = unit((m.kill_participation - 0.5) / 0.25);
+    let damage_ratio = m.damage_share / damage_share_baseline(&game.position);
+    let damage = unit((damage_ratio - 1.0) / 0.5);
+    let gold_ratio = m.gold_share / gold_share_baseline(&game.position);
+    let gold = unit((gold_ratio - 1.0) / 0.25);
+    (deaths + participation + damage + gold) / 4.0
+}
+
 /// League Akari's scoring model (`analysis/player/scoring.ts`), weights unchanged.
 mod akari {
     use super::{minutes, GameMetrics, GameSummary};
@@ -786,6 +868,18 @@ fn damage_share_baseline(position: &str) -> f64 {
         "JUNGLE" => 0.17,
         "TOP" => 0.22,
         "MIDDLE" | "BOTTOM" => 0.26,
+        _ => 0.20,
+    }
+}
+
+/// Typical share of team gold per position in solo queue.
+fn gold_share_baseline(position: &str) -> f64 {
+    match position {
+        "UTILITY" => 0.13,
+        "JUNGLE" => 0.19,
+        "TOP" => 0.21,
+        "MIDDLE" => 0.22,
+        "BOTTOM" => 0.24,
         _ => 0.20,
     }
 }
@@ -928,6 +1022,24 @@ mod tests {
         assert_eq!(profile.scope, SampleScope::Ranked);
         assert_eq!(profile.sample_games, 5);
         assert_eq!(profile.wins, 0);
+    }
+
+    #[test]
+    fn ranked_form_skips_other_queues_and_discounts_off_role_games() {
+        let mut games = many(5, 450, GameResult::Loss, [0, 10, 0]);
+        games.extend(many(3, 420, GameResult::Loss, [0, 10, 0]));
+        games.extend(many(3, 440, GameResult::Win, [5, 2, 5]));
+        for game in &mut games[5..8] {
+            game.position = "UTILITY".to_owned();
+        }
+        let ctx = ProfileContext {
+            position: "MIDDLE".to_owned(),
+            ..ProfileContext::default()
+        };
+        let form = build(&page(games), &ctx).form.unwrap();
+        assert_eq!(form.games, 6);
+        assert_eq!(form.off_role_games, 3);
+        assert!(form.wins / form.weight > 0.6);
     }
 
     #[test]

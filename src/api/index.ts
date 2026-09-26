@@ -198,12 +198,20 @@ export interface RosterPlayer {
   isSelf: boolean;
 }
 
+export interface AnonymousPlayer {
+  /** Locked or hovered champion; 0 when none yet. */
+  championId: number;
+  position: string;
+}
+
 export interface Roster {
   stage: RosterStage;
   gameId: number;
   /** 0 when unknown (champ select does not say). */
   queueId: number;
   allies: RosterPlayer[];
+  /** Teammates anonymous in champ select; named by the client once the game loads. */
+  anonymousAllies: AnonymousPlayer[];
   enemies: RosterPlayer[];
   /** Opponents the client does not identify; during champ select that is all of them. */
   hiddenEnemies: number;
@@ -388,8 +396,9 @@ export const api = {
   relaunchAsAdmin: () => invoke<void>("relaunch_as_admin"),
   lookupSummoner: (riotId: string) => invoke<Summoner>("lookup_summoner", { riotId }),
   summonerByPuuid: (puuid: string) => invoke<Summoner>("summoner_by_puuid", { puuid }),
-  matchHistory: (puuid: string, start: number, count: number) =>
-    invoke<MatchHistoryPage>("match_history", { puuid, start, count }),
+  /** `queue` keeps only games from that queue. */
+  matchHistory: (puuid: string, start: number, count: number, queue: number | null = null) =>
+    invoke<MatchHistoryPage>("match_history", { puuid, start, count, queue }),
   gameData: () => invoke<GameData>("game_data"),
   gameDetail: (gameId: number) => invoke<GameDetail>("game_detail", { gameId }),
   gameBuilds: (gameId: number) => invoke<PlayerBuild[]>("game_builds", { gameId }),

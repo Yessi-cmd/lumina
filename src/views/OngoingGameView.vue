@@ -22,6 +22,14 @@ const title = computed(() => {
   return r.queueId > 0 ? `${stage} · ${gd.queueName(r.queueId, "")}` : stage;
 });
 
+const POSITIONS: Record<string, string> = {
+  TOP: "上单",
+  JUNGLE: "打野",
+  MIDDLE: "中单",
+  BOTTOM: "下路",
+  UTILITY: "辅助",
+};
+
 const ADVICE_TONE: Record<TagTone, string> = {
   positive: "border-emerald-700/60 bg-emerald-950/40",
   negative: "border-red-700/60 bg-red-950/40",
@@ -81,6 +89,25 @@ function championOf(puuid: string): number {
             :relation-tags="insights?.tags[p.puuid]"
             :power="insights?.powers[p.puuid]"
           />
+          <div
+            v-for="(a, i) in roster.anonymousAllies"
+            :key="`anonymous-${i}`"
+            class="flex items-center gap-3 rounded-lg border border-dashed border-zinc-700 bg-zinc-900/50 p-3"
+          >
+            <img
+              v-if="a.championId > 0"
+              :src="gd.championIcon(a.championId)"
+              class="size-10 shrink-0 rounded bg-zinc-800"
+            />
+            <div v-else class="size-10 shrink-0 rounded bg-zinc-800" />
+            <div class="min-w-0">
+              <div class="text-sm font-medium text-zinc-300">
+                匿名队友
+                <span v-if="POSITIONS[a.position]" class="ml-1 text-xs text-zinc-500">{{ POSITIONS[a.position] }}</span>
+              </div>
+              <div class="text-xs text-zinc-500">选人阶段开启了匿名，进入加载界面后客户端会公开身份，届时自动显示战绩。</div>
+            </div>
+          </div>
         </div>
 
         <div class="flex flex-col gap-2">

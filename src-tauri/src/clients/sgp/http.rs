@@ -28,21 +28,26 @@ impl SgpClient {
         &self.server
     }
 
-    /// Newest first. Authenticated with the LCU entitlements access token.
+    /// Newest first, optionally only one queue. Authenticated with the LCU entitlements
+    /// access token.
     pub async fn match_history(
         &self,
         entitlements_token: &str,
         puuid: &str,
         start: u32,
         count: u32,
+        queue: Option<i64>,
     ) -> Result<SgpMatchHistory> {
         let base = &self.server.server.match_history;
         let url = format!("{base}/match-history-query/v1/products/lol/player/{puuid}/SUMMARY");
-        let request = self
+        let mut request = self
             .client
             .get(url)
             .bearer_auth(entitlements_token)
             .query(&[("startIndex", start), ("count", count)]);
+        if let Some(queue) = queue {
+            request = request.query(&[("tag", format!("q_{queue}"))]);
+        }
         Self::send(request).await
     }
 

@@ -8,7 +8,7 @@ use crate::clients::lcu::models::{
     ChampSelectMember, ChampSelectSession, GameflowPlayer, GameflowSession, LcuEvent, LcuEventType,
     LobbySession,
 };
-use crate::state::ongoing::{Roster, RosterPlayer, RosterStage};
+use crate::state::ongoing::{AnonymousPlayer, Roster, RosterPlayer, RosterStage};
 use crate::state::AppState;
 
 pub const CHAMP_SELECT_SESSION: &str = "/lol-champ-select/v1/session";
@@ -229,6 +229,7 @@ fn from_lobby(lobby: LobbySession, self_puuid: &str) -> Roster {
         game_id: 0,
         queue_id: lobby.game_config.queue_id,
         allies,
+        anonymous_allies: Vec::new(),
         enemies: Vec::new(),
         hidden_enemies: 0,
         enemy_champions: Vec::new(),
@@ -238,7 +239,16 @@ fn from_lobby(lobby: LobbySession, self_puuid: &str) -> Roster {
 fn from_champ_select(session: ChampSelectSession) -> Roster {
     let local = session.local_player_cell_id;
     let mut allies = Vec::new();
+    let mut anonymous_allies = Vec::new();
     for member in session.my_team {
+        // Anonymous by their own choice: show the seat, not who sits in it.
+        if member.name_visibility_type == "HIDDEN" && member.cell_id != local {
+            anonymous_allies.push(AnonymousPlayer {
+                champion_id: picked_champion(&member),
+                position: member.assigned_position.to_uppercase(),
+            });
+            continue;
+        }
         allies.extend(champ_select_player(member, local));
     }
     let mut enemies = Vec::new();
@@ -258,6 +268,7 @@ fn from_champ_select(session: ChampSelectSession) -> Roster {
         game_id: session.game_id,
         queue_id: 0,
         allies,
+        anonymous_allies,
         enemies,
         hidden_enemies,
         enemy_champions,
@@ -268,17 +279,21 @@ fn champ_select_player(member: ChampSelectMember, local_cell: i64) -> Option<Ros
     if member.name_visibility_type == "HIDDEN" || !is_known(&member.puuid) {
         return None;
     }
-    let champion_id = if member.champion_id > 0 {
-        member.champion_id
-    } else {
-        member.champion_pick_intent
-    };
     Some(RosterPlayer {
+        champion_id: picked_champion(&member),
         puuid: member.puuid,
-        champion_id,
         position: member.assigned_position.to_uppercase(),
         is_self: member.cell_id == local_cell,
     })
+}
+
+/// Locked champion, else the hovered one.
+fn picked_champion(member: &ChampSelectMember) -> i64 {
+    if member.champion_id > 0 {
+        member.champion_id
+    } else {
+        member.champion_pick_intent
+    }
 }
 
 /// `None` when the local player is in neither team (e.g. spectating).
@@ -313,6 +328,7 @@ fn from_gameflow(session: GameflowSession, self_puuid: &str) -> Option<Roster> {
         game_id: data.game_id,
         queue_id: data.queue.id,
         allies,
+        anonymous_allies: Vec::new(),
         enemies,
         hidden_enemies,
         enemy_champions,
@@ -346,7 +362,9 @@ mod tests {
             "myTeam":[
               {"cellId":1,"puuid":"a","championId":0,"championPickIntent":64,
                "assignedPosition":"jungle","nameVisibilityType":"VISIBLE"},
-              {"cellId":2,"puuid":"me","championId":103,"nameVisibilityType":"VISIBLE"}],
+              {"cellId":2,"puuid":"me","championId":103,"nameVisibilityType":"VISIBLE"},
+              {"cellId":3,"puuid":"","championId":412,"assignedPosition":"utility",
+               "nameVisibilityType":"HIDDEN"}],
             "theirTeam":[
               {"cellId":5,"puuid":"","nameVisibilityType":"HIDDEN"},
               {"cellId":6,"puuid":"","nameVisibilityType":"HIDDEN"}]}"#;
@@ -356,6 +374,8 @@ mod tests {
         assert_eq!(roster.allies[0].champion_id, 64);
         assert_eq!(roster.allies[0].position, "JUNGLE");
         assert!(roster.allies[1].is_self);
+        assert_eq!(roster.anonymous_allies[0].champion_id, 412);
+        assert_eq!(roster.anonymous_allies[0].position, "UTILITY");
         assert!(roster.enemies.is_empty());
         assert_eq!(roster.hidden_enemies, 2);
     }

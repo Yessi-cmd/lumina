@@ -1,33 +1,34 @@
 //! 田忌赛马: who is strong and who is weak in this game, and where to spend resources.
 //!
-//! Every identified player gets a power index (0–100, 50 = average) from three signals:
-//! recent win rate shrunk towards 50% for small samples, Akari Score, and gold against the
-//! lane opponent at 10 minutes. Players are then ranked within their own team (上等马 /
-//! 下等马), opponents are called out as 硬骨头 / 软柿子, same-position players are compared
-//! lane by lane, and early deaths to the enemy jungler mark players as easy or hard to gank.
+//! Every identified player gets a power index (0–100, 50 = average) from solo/duo and flex
+//! games only, recent games and games on the current position weighted most: win rate
+//! shrunk towards 50% for small samples, performance against the average player on the
+//! same position, and gold against the lane opponent at 10 minutes. Players are then
+//! ranked within their own team (上等马 / 下等马), opponents are called out as 硬骨头 /
+//! 软柿子, same-position players are compared lane by lane, and early deaths to the enemy
+//! jungler mark players as easy or hard to gank.
 
 use std::collections::HashMap;
 
 use serde::Serialize;
 
-use super::player_profile::{PlayerProfile, PlayerTag, Tone};
+use super::player_profile::{PlayerProfile, PlayerTag, RankedForm, Tone};
 use super::timeline::EarlyStats;
 use crate::state::ongoing::{Roster, RosterPlayer};
 
 /// Every threshold in one place.
 mod limits {
-    /// Fewer games in the profile sample and the player gets no power index.
+    /// Fewer solo/duo and flex games and the player gets no power index.
     pub const POWER_MIN_GAMES: usize = 5;
     /// Pseudo-games at 50% mixed into the win rate, so 3-0 is not treated as 100%.
-    pub const WIN_RATE_PRIOR_GAMES: f64 = 5.0;
-    pub const WIN_RATE_WEIGHT: f64 = 60.0;
-    /// Akari Score around which the score neither adds nor subtracts power.
-    pub const SCORE_PIVOT: f64 = 5.0;
-    pub const SCORE_WEIGHT: f64 = 4.0;
-    pub const SCORE_CAP: f64 = 12.0;
+    pub const WIN_RATE_PRIOR_GAMES: f64 = 4.0;
+    pub const WIN_RATE_WEIGHT: f64 = 50.0;
+    /// Power per unit of ranked performance (-1..1), and the most it can add or remove.
+    pub const PERFORMANCE_WEIGHT: f64 = 24.0;
+    pub const PERFORMANCE_CAP: f64 = 12.0;
     /// Gold at 10 minutes per power point, and the most it can add or remove.
-    pub const LANE_GOLD_PER_POINT: f64 = 50.0;
-    pub const LANE_CAP: f64 = 10.0;
+    pub const LANE_GOLD_PER_POINT: f64 = 40.0;
+    pub const LANE_CAP: f64 = 12.0;
     pub const LANE_MIN_GAMES: usize = 3;
     /// Distance from the team median before someone is called 上等马 / 下等马.
     pub const TIER_GAP: f64 = 6.0;
@@ -297,31 +298,30 @@ impl Matchup {
 }
 
 fn power_index(profile: &PlayerProfile, early: Option<&EarlyStats>) -> Option<f64> {
-    if profile.sample_games < limits::POWER_MIN_GAMES {
+    let form = profile.form.as_ref()?;
+    if form.games < limits::POWER_MIN_GAMES {
         return None;
     }
-    let (win, score, lane) = power_parts(profile, early);
-    Some((50.0 + win + score + lane).clamp(0.0, 100.0))
+    let (win, performance, lane) = power_parts(form, early);
+    Some((50.0 + win + performance + lane).clamp(0.0, 100.0))
 }
 
-/// Contributions of win rate, Akari Score and laning to the power index.
-fn power_parts(profile: &PlayerProfile, early: Option<&EarlyStats>) -> (f64, f64, f64) {
+/// Contributions of ranked win rate, ranked performance and laning to the power index.
+fn power_parts(form: &RankedForm, early: Option<&EarlyStats>) -> (f64, f64, f64) {
     let prior = limits::WIN_RATE_PRIOR_GAMES;
-    let games = profile.sample_games as f64;
-    let shrunk = (profile.wins as f64 + prior / 2.0) / (games + prior);
+    let shrunk = (form.wins + prior / 2.0) / (form.weight + prior);
     let win = (shrunk - 0.5) * limits::WIN_RATE_WEIGHT;
 
-    let mut score = 0.0;
-    if let Some(s) = &profile.akari_score {
-        let raw = (s.total - limits::SCORE_PIVOT) * limits::SCORE_WEIGHT;
-        score = raw.clamp(-limits::SCORE_CAP, limits::SCORE_CAP);
-    }
+    let cap = limits::PERFORMANCE_CAP;
+    let raw = form.performance.unwrap_or(0.0) * limits::PERFORMANCE_WEIGHT;
+    let performance = raw.clamp(-cap, cap);
+
     let mut lane = 0.0;
     if let Some(e) = lane_sample(early) {
         let raw = e.avg_gold_diff_10 / limits::LANE_GOLD_PER_POINT;
         lane = raw.clamp(-limits::LANE_CAP, limits::LANE_CAP);
     }
-    (win, score, lane)
+    (win, performance, lane)
 }
 
 fn lane_sample(early: Option<&EarlyStats>) -> Option<&EarlyStats> {
@@ -329,17 +329,24 @@ fn lane_sample(early: Option<&EarlyStats>) -> Option<&EarlyStats> {
 }
 
 fn breakdown(profile: &PlayerProfile, early: Option<&EarlyStats>, power: f64) -> String {
-    let (win, score, lane) = power_parts(profile, early);
-    let rate = (profile.win_rate * 100.0).round();
-    let n = profile.sample_games;
-    let mut text = format!("战力 {power:.0} = 50 + 胜率 {win:+.0}（{rate}%，{n} 场）");
-    if let Some(s) = &profile.akari_score {
-        let total = s.total;
-        text.push_str(&format!(" + 评分 {score:+.0}（{total:.1}）"));
+    let Some(form) = &profile.form else {
+        return String::new();
+    };
+    let (win, performance, lane) = power_parts(form, early);
+    let rate = (form.wins / form.weight * 100.0).round();
+    let n = form.games;
+    let head = format!("战力 {power:.0} = 50 + 胜率 {win:+.0}");
+    let mut text = format!("{head}（单双排/灵活 {n} 场，近期加权 {rate}%）");
+    if form.performance.is_some() {
+        text.push_str(&format!(" + 表现 {performance:+.0}"));
     }
     if let Some(e) = lane_sample(early) {
         let gold = e.avg_gold_diff_10;
         text.push_str(&format!(" + 对线 {lane:+.0}（10 分钟经济差 {gold:+.0}）"));
+    }
+    if form.off_role_games > 0 {
+        let off = form.off_role_games;
+        text.push_str(&format!("。{off} 场不在本位置，权重降低"));
     }
     text
 }
@@ -435,6 +442,13 @@ mod tests {
             top_champions: Vec::new(),
             position: String::new(),
             tags: Vec::new(),
+            form: Some(RankedForm {
+                games,
+                off_role_games: 0,
+                weight: games as f64,
+                wins: wins as f64,
+                performance: None,
+            }),
         }
     }
 
@@ -464,6 +478,7 @@ mod tests {
             game_id: 1,
             queue_id: 420,
             allies,
+            anonymous_allies: Vec::new(),
             enemies,
             hidden_enemies: 0,
             enemy_champions: Vec::new(),

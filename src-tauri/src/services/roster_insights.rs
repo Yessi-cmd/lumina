@@ -18,10 +18,10 @@ use crate::state::ongoing::Roster;
 use crate::state::session::LcuSession;
 use crate::state::AppState;
 
-/// Recent Rift games per player whose timelines are read.
-const TIMELINE_GAMES: usize = 6;
-/// Summoner's Rift queues; other modes have no lanes or junglers.
-const RIFT_QUEUES: [i64; 6] = [400, 420, 430, 440, 490, 700];
+/// Recent ranked games per player whose timelines are read.
+const TIMELINE_GAMES: usize = 8;
+/// Solo/duo and flex: laning in normal games says little about laning in ranked.
+const TIMELINE_QUEUES: [i64; 2] = [420, 440];
 
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -99,7 +99,7 @@ fn profiles(roster: &Roster, pages: &[MatchHistoryPage]) -> HashMap<String, Play
     out
 }
 
-/// Reads the timelines of each player's recent Rift games (shared games once) and
+/// Reads the timelines of each player's recent ranked games (shared games once) and
 /// averages their early game. Without SGP there are no timelines and no early stats.
 async fn early_stats(
     state: &AppState,
@@ -116,8 +116,8 @@ async fn early_stats(
         let Some(page) = pages.iter().find(|p| p.puuid == puuid) else {
             continue;
         };
-        let rift = page.games.iter().filter(|g| on_rift(g));
-        let games: Vec<&GameSummary> = rift.take(TIMELINE_GAMES).collect();
+        let ranked = page.games.iter().filter(|g| has_timeline(g));
+        let games: Vec<&GameSummary> = ranked.take(TIMELINE_GAMES).collect();
         for game in &games {
             unique.entry(game.game_id).or_insert(*game);
         }
@@ -161,8 +161,8 @@ async fn early_stats(
     out
 }
 
-/// Finished Rift games that list their participants (SGP pages only).
-fn on_rift(game: &GameSummary) -> bool {
+/// Finished ranked games that list their participants (SGP pages only).
+fn has_timeline(game: &GameSummary) -> bool {
     let finished = matches!(game.result, GameResult::Win | GameResult::Loss);
-    finished && RIFT_QUEUES.contains(&game.queue_id) && !game.participants.is_empty()
+    finished && TIMELINE_QUEUES.contains(&game.queue_id) && !game.participants.is_empty()
 }

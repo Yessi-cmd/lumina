@@ -3,14 +3,29 @@ import { computed, ref, shallowRef, watch } from "vue";
 import { useRoute } from "vue-router";
 import { api, PANEL_HISTORY_COUNT, type DataSource, type GameSummary, type Summoner } from "../api";
 import MatchRow from "../components/match/MatchRow.vue";
-import { profileIconUrl } from "../stores/gameData";
+import { profileIconUrl, useGameDataStore } from "../stores/gameData";
 import { useLcuStore } from "../stores/lcu";
+import { kdaRatio } from "../utils/format";
 
 // Same size as the game panel, so opening a player from there hits the cache.
 const PAGE_SIZE = PANEL_HISTORY_COUNT;
+/** Queues offered in the mode filter; SGP filters them on the server. */
+const QUEUES: { id: number; label: string }[] = [
+  { id: 420, label: "单双排" },
+  { id: 440, label: "灵活排位" },
+  { id: 490, label: "快速匹配" },
+  { id: 400, label: "匹配（征召）" },
+  { id: 430, label: "匹配（自选）" },
+  { id: 450, label: "极地大乱斗" },
+  { id: 1700, label: "斗魂竞技场" },
+];
 
 const lcu = useLcuStore();
+const gd = useGameDataStore();
 const route = useRoute();
+
+const queueFilter = ref<number | null>(null);
+const championFilter = ref<number | null>(null);
 
 const query = ref("");
 const summoner = shallowRef<Summoner | null>(null);
@@ -22,6 +37,33 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 // Guards against a slow response for a previous player overwriting the current one.
 let generation = 0;
+
+/** Champions in the loaded games, most played first. */
+const championOptions = computed(() => {
+  const counts = new Map<number, number>();
+  for (const g of games.value) counts.set(g.championId, (counts.get(g.championId) ?? 0) + 1);
+  const options = [...counts].map(([id, n]) => ({ id, n, name: gd.championName(id) }));
+  return options.sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, "zh-CN"));
+});
+
+const shown = computed(() => {
+  const champion = championFilter.value;
+  return champion === null ? games.value : games.value.filter((g) => g.championId === champion);
+});
+
+/** Win rate and KDA of the shown games; remakes do not count. */
+const summary = computed(() => {
+  const counted = shown.value.filter((g) => g.result === "win" || g.result === "loss");
+  if (counted.length === 0) return null;
+  const wins = counted.filter((g) => g.result === "win").length;
+  const sum = (f: (g: GameSummary) => number) => counted.reduce((acc, g) => acc + f(g), 0);
+  return {
+    games: counted.length,
+    wins,
+    winRate: Math.round((wins / counted.length) * 100),
+    kda: kdaRatio(sum((g) => g.kills), sum((g) => g.deaths), sum((g) => g.assists)),
+  };
+});
 
 const riotId = computed(() => {
   const s = summoner.value;
@@ -39,6 +81,19 @@ async function show(target: Summoner) {
   await fetchPage(gen);
 }
 
+/** A new mode means a new list from the server; the champion filter stays. */
+function onQueueChange() {
+  const target = summoner.value;
+  if (target) show(target);
+}
+
+function clearFilters() {
+  championFilter.value = null;
+  if (queueFilter.value === null) return;
+  queueFilter.value = null;
+  onQueueChange();
+}
+
 function loadMore() {
   if (!loading.value) fetchPage(generation);
 }
@@ -49,7 +104,7 @@ async function fetchPage(gen: number) {
   loading.value = true;
   error.value = null;
   try {
-    const page = await api.matchHistory(target.puuid, games.value.length, PAGE_SIZE);
+    const page = await api.matchHistory(target.puuid, games.value.length, PAGE_SIZE, queueFilter.value);
     if (gen !== generation) return;
     games.value = [...games.value, ...page.games];
     source.value = page.source;
@@ -148,19 +203,49 @@ watch(
       </div>
     </div>
 
+    <div v-if="summoner" class="flex flex-wrap items-center gap-2 text-sm">
+      <select
+        v-model="queueFilter"
+        class="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1"
+        @change="onQueueChange"
+      >
+        <option :value="null">全部模式</option>
+        <option v-for="q in QUEUES" :key="q.id" :value="q.id">{{ q.label }}</option>
+      </select>
+      <select v-model="championFilter" class="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1">
+        <option :value="null">全部英雄</option>
+        <option v-for="c in championOptions" :key="c.id" :value="c.id">{{ c.name }}（{{ c.n }}）</option>
+      </select>
+      <button
+        v-if="queueFilter !== null || championFilter !== null"
+        class="rounded-md px-2 py-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+        @click="clearFilters"
+      >
+        清除筛选
+      </button>
+      <span v-if="summary" class="ml-auto text-zinc-400">
+        {{ summary.games }} 场 {{ summary.wins }} 胜 ·
+        <span :class="summary.winRate >= 50 ? 'text-emerald-400' : 'text-red-400'">胜率 {{ summary.winRate }}%</span>
+        · KDA {{ summary.kda }}
+      </span>
+    </div>
+    <p v-if="championFilter !== null && hasMore" class="-mt-2 text-xs text-zinc-500">
+      英雄筛选只在已加载的 {{ games.length }} 场里找，点底部“加载更多”可以往前翻。
+    </p>
+
     <p v-if="error" class="text-sm break-all text-red-400">{{ error }}</p>
 
     <div class="flex flex-col gap-1.5">
       <MatchRow
-        v-for="game in games"
+        v-for="game in shown"
         :key="game.gameId"
         :game="game"
         :puuid="summoner?.puuid ?? ''"
       />
     </div>
 
-    <p v-if="summoner && !loading && games.length === 0 && !error" class="text-sm text-zinc-400">
-      没有找到对局记录。
+    <p v-if="summoner && !loading && shown.length === 0 && !error" class="text-sm text-zinc-400">
+      {{ games.length === 0 ? "没有找到对局记录。" : "已加载的对局里没有这个英雄。" }}
     </p>
 
     <button
