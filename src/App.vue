@@ -3,6 +3,7 @@ import { computed, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AppIcon, { type IconName } from "./components/common/AppIcon.vue";
 import AutoAcceptBanner from "./components/common/AutoAcceptBanner.vue";
+import UpdateBanner from "./components/common/UpdateBanner.vue";
 import TitleBar from "./components/common/TitleBar.vue";
 import TooltipLayer from "./components/common/TooltipLayer.vue";
 import { useAppStore } from "./stores/app";
@@ -60,6 +61,7 @@ const statusDot = computed(() => {
 
 onMounted(() => {
   app.load().catch((err) => console.error("Failed to load app info", err));
+  app.watchUpdates();
   lcu.start().catch((err) => console.error("Failed to start LCU store", err));
   ongoing.start().catch((err) => console.error("Failed to start ongoing store", err));
   settings.start().catch((err) => console.error("Failed to start settings store", err));
@@ -182,6 +184,7 @@ onMounted(() => {
     <div class="flex min-w-0 flex-1 flex-col">
       <TitleBar :title="pageTitle" />
       <AutoAcceptBanner />
+      <UpdateBanner />
       <main class="min-w-0 flex-1 overflow-auto px-6 pt-2 pb-8">
         <RouterView v-slot="{ Component, route: current }">
           <Transition name="page" mode="out-in">

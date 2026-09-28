@@ -19,3 +19,4 @@ pub mod roster_insights;
 pub mod roster_relations;
 pub mod summoner;
 pub mod timeline;
+pub mod update_check;

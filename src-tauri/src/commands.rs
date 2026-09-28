@@ -16,6 +16,7 @@ use crate::services::match_history::MatchHistoryPage;
 use crate::services::player_profile::{PlayerProfile, ProfileContext};
 use crate::services::ranked_champions::RankedChampions;
 use crate::services::roster_insights::RosterInsights;
+use crate::services::update_check::UpdateInfo;
 use crate::state::ongoing::Roster;
 use crate::state::{AppState, LcuSnapshot};
 
@@ -256,4 +257,15 @@ pub async fn champion_matchups(
 pub async fn game_builds(state: State<'_, AppState>, game_id: i64) -> Result<Vec<PlayerBuild>> {
     let session = state.session()?;
     state.game_details.builds(&session, game_id).await
+}
+
+/// Newest release on GitHub against the running version.
+#[tauri::command]
+pub async fn check_update() -> Result<UpdateInfo> {
+    services::update_check::check().await
+}
+
+#[tauri::command]
+pub fn open_release(url: String) -> Result<()> {
+    services::update_check::open_release(&url)
 }

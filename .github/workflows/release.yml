@@ -31,3 +31,17 @@ jobs:
           releaseBody: See the assets below to download and install this version.
           releaseDraft: true
           prerelease: false
+      # The exe embeds every resource, so it runs without installing (WebView2 ships
+      # with Windows 10/11). Zipped because chat apps often block bare .exe files.
+      - name: Upload portable build
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          $dir = "Lumina_${version}_portable"
+          New-Item -ItemType Directory $dir | Out-Null
+          Copy-Item src-tauri/target/release/lumina.exe "$dir/Lumina.exe"
+          $zip = "Lumina_${version}_x64_portable.zip"
+          Compress-Archive -Path $dir -DestinationPath $zip
+          gh release upload "${{ github.ref_name }}" $zip --clobber

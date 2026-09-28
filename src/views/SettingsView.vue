@@ -3,8 +3,10 @@ import { computed, onMounted, ref } from "vue";
 import { api } from "../api";
 import AppIcon from "../components/common/AppIcon.vue";
 import ToggleSwitch from "../components/common/ToggleSwitch.vue";
+import { useAppStore } from "../stores/app";
 import { useSettingsStore } from "../stores/settings";
 
+const app = useAppStore();
 const store = useSettingsStore();
 const s = computed(() => store.settings);
 
@@ -161,6 +163,32 @@ function onDelayInput(event: Event) {
           </button>
         </div>
         <p v-if="logError" class="mt-2 px-1 text-sm text-red-400">{{ logError }}</p>
+      </div>
+
+      <div>
+        <h2 class="eyebrow mb-2 px-1">版本</h2>
+        <div class="card flex items-center justify-between gap-6 p-4">
+          <div class="min-w-0">
+            <div class="font-medium text-zinc-100">Lumina v{{ app.info?.version ?? "…" }}</div>
+            <div class="mt-0.5 text-sm text-zinc-400">
+              <template v-if="app.checking">正在检查更新…</template>
+              <template v-else-if="app.updateError">检查更新失败：{{ app.updateError }}</template>
+              <template v-else-if="app.update?.available">
+                GitHub 上有新版本 v{{ app.update.latest }}。
+              </template>
+              <template v-else-if="app.update">已是最新版本。</template>
+              <template v-else>启动时和之后每 6 小时自动检查 GitHub 上的新版本。</template>
+            </div>
+          </div>
+          <div class="flex shrink-0 gap-2">
+            <button v-if="app.update?.available" class="btn btn-primary" @click="app.openRelease()">
+              前往下载
+            </button>
+            <button class="btn btn-secondary" :disabled="app.checking" @click="app.checkUpdate()">
+              检查更新
+            </button>
+          </div>
+        </div>
       </div>
     </template>
   </section>

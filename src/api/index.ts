@@ -515,6 +515,17 @@ export interface PendingAccept {
   acceptAt: number;
 }
 
+/** Newest GitHub release against the running version. */
+export interface UpdateInfo {
+  current: string;
+  /** Without the leading `v`. */
+  latest: string;
+  available: boolean;
+  url: string;
+  /** Release notes, Markdown. */
+  notes: string;
+}
+
 /** Page size the backend prefetches for every player in the current game. */
 export const PANEL_HISTORY_COUNT = 20;
 
@@ -551,6 +562,8 @@ export const api = {
   rankedChampions: (puuid: string) => invoke<RankedChampions>("ranked_champions", { puuid }),
   logDir: () => invoke<string>("log_dir"),
   openLogDir: () => invoke<void>("open_log_dir"),
+  checkUpdate: () => invoke<UpdateInfo>("check_update"),
+  openRelease: (url: string) => invoke<void>("open_release", { url }),
   logFrontend: (level: "info" | "warn" | "error", message: string) =>
     invoke<void>("log_frontend", { level, message }),
 };
