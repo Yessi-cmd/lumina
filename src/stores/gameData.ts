@@ -78,6 +78,17 @@ export const useGameDataStore = defineStore("gameData", () => {
     return { title: name, body: data.value?.perkDescriptions?.[id] || undefined };
   }
 
+  function augmentIcon(id: number): string {
+    const path = data.value?.augments?.[id]?.icon;
+    return path ? assetUrl(path) : "";
+  }
+
+  function augmentTip(id: number): TipContent {
+    const augment = data.value?.augments?.[id];
+    if (!augment) return { title: `海克斯 ${id}` };
+    return { title: augment.name, subtitle: AUGMENT_RARITY[augment.rarity] };
+  }
+
   function queueName(queueId: number, gameMode: string): string {
     return data.value?.queueNames[queueId] || gameMode || `队列 ${queueId}`;
   }
@@ -94,8 +105,16 @@ export const useGameDataStore = defineStore("gameData", () => {
     itemTip,
     spellTip,
     perkTip,
+    augmentIcon,
+    augmentTip,
   };
 });
+
+const AUGMENT_RARITY: Record<string, string> = {
+  prismatic: "棱彩",
+  gold: "金色",
+  silver: "银色",
+};
 
 export function profileIconUrl(iconId: number): string {
   return assetUrl(`/lol-game-data/assets/v1/profile-icons/${iconId}.jpg`);

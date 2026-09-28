@@ -32,6 +32,23 @@ const RESULT: Record<GameResult, { label: string; bar: string; text: string; bg:
   remake: { label: "重开", bar: "bg-zinc-500", text: "text-zinc-400", bg: "", glow: "" },
   abort: { label: "中止", bar: "bg-zinc-600", text: "text-zinc-500", bg: "", glow: "" },
 };
+const BADGE = {
+  mvp: {
+    label: "MVP",
+    tip: { title: "MVP", body: "胜方表现最好的玩家（KDA、参团、伤害、承伤、经济、视野综合）。" },
+    class: "bg-amber-400/20 text-amber-200 ring-amber-300/50 shadow-[0_0_10px_-2px_rgb(245_158_11/0.7)]",
+  },
+  svp: {
+    label: "SVP",
+    tip: { title: "SVP", body: "败方表现最好的玩家（KDA、参团、伤害、承伤、经济、视野综合）。" },
+    class: "bg-sky-400/15 text-sky-200 ring-sky-300/40",
+  },
+} as const;
+const AUGMENT_RING: Record<string, string> = {
+  prismatic: "ring-fuchsia-300/60",
+  gold: "ring-amber-300/60",
+  silver: "ring-zinc-300/40",
+};
 const MULTI_KILL: Record<number, string> = { 2: "双杀", 3: "三杀", 4: "四杀", 5: "五杀" };
 const POSITIONS: Record<string, string> = {
   TOP: "上单",
@@ -104,7 +121,7 @@ const lineup = computed(() => {
     ]"
   >
     <div
-      class="group/row grid cursor-pointer grid-cols-[4px_6.5rem_auto_7.5rem_minmax(12rem,1fr)_auto_auto_1rem] items-center gap-x-4 py-2 pr-3 transition-colors hover:bg-white/[0.025]"
+      class="group/row grid cursor-pointer grid-cols-[4px_6.5rem_auto_9rem_minmax(11rem,1fr)_auto_auto_1rem] items-center gap-x-4 py-2 pr-3 transition-colors hover:bg-white/[0.025]"
       @click="expanded = !expanded"
     >
       <div class="my-1 w-[3px] self-stretch rounded-r-full" :class="result.bar" />
@@ -169,9 +186,17 @@ const lineup = computed(() => {
           {{ game.kills }}<span class="text-zinc-600"> / </span><span class="text-red-400">{{ game.deaths }}</span
           ><span class="text-zinc-600"> / </span>{{ game.assists }}
         </div>
-        <div class="mt-1 flex items-center justify-center gap-1">
+        <div class="mt-1 flex flex-wrap items-center justify-center gap-1">
           <span class="rounded-md px-1.5 py-px text-[11px] font-medium ring-1 ring-inset tabular-nums" :class="kdaClass">
             {{ kda === "Perfect" ? "完美" : `${kda} KDA` }}
+          </span>
+          <span
+            v-if="game.badge"
+            v-tip="BADGE[game.badge].tip"
+            class="rounded-md px-1.5 py-px text-[11px] font-bold tracking-wide ring-1 ring-inset"
+            :class="BADGE[game.badge].class"
+          >
+            {{ BADGE[game.badge].label }}
           </span>
           <span
             v-if="multiKill"
@@ -213,28 +238,52 @@ const lineup = computed(() => {
       </div>
       <div v-else class="w-14" />
 
-      <!-- Items and lineup -->
-      <div class="flex items-center gap-4">
-        <div class="grid grid-cols-4 gap-0.5">
-          <template v-for="(item, i) in game.items" :key="i">
+      <!-- Items, augments and lineup. Fixed tracks: fractional ones squeeze the icons. -->
+      <div class="flex shrink-0 items-center gap-3">
+        <div class="flex items-center gap-1">
+          <div class="grid grid-cols-[repeat(3,1.625rem)] gap-0.5">
+            <template v-for="(item, i) in game.items.slice(0, 6)" :key="i">
+              <img
+                v-if="gd.itemIcon(item)"
+                v-tip="gd.itemTip(item)"
+                :src="gd.itemIcon(item)"
+                class="icon-hover size-[1.625rem] rounded-md bg-zinc-800 object-cover"
+              />
+              <div v-else class="size-[1.625rem] rounded-md bg-zinc-800/60" />
+            </template>
+          </div>
+          <img
+            v-if="gd.itemIcon(game.items[6])"
+            v-tip="gd.itemTip(game.items[6])"
+            :src="gd.itemIcon(game.items[6])"
+            class="icon-hover size-[1.625rem] shrink-0 rounded-full bg-zinc-800 object-cover"
+          />
+          <div v-else class="size-[1.625rem] shrink-0 rounded-full bg-zinc-800/60" />
+        </div>
+        <div v-if="game.augments.length" class="grid grid-flow-col grid-rows-2 gap-0.5">
+          <template v-for="a in game.augments" :key="a">
             <img
-              v-if="gd.itemIcon(item)"
-              v-tip="gd.itemTip(item)"
-              :src="gd.itemIcon(item)"
-              class="icon-hover size-7 rounded-md bg-zinc-800"
-              :class="i === 6 && 'rounded-full'"
+              v-if="gd.augmentIcon(a)"
+              v-tip="gd.augmentTip(a)"
+              :src="gd.augmentIcon(a)"
+              class="icon-hover size-[1.625rem] rounded-md bg-zinc-950 object-cover ring-1 ring-inset"
+              :class="AUGMENT_RING[gd.data?.augments?.[a]?.rarity ?? ''] ?? 'ring-white/10'"
             />
-            <div v-else class="size-7 rounded-md bg-zinc-800/60" :class="i === 6 && 'rounded-full'" />
+            <div
+              v-else
+              v-tip="gd.augmentTip(a)"
+              class="size-[1.625rem] rounded-md bg-zinc-800 ring-1 ring-white/10 ring-inset"
+            />
           </template>
         </div>
-        <div class="flex flex-col gap-0.5">
+        <div class="flex shrink-0 flex-col gap-0.5">
           <div v-for="(team, t) in lineup" :key="t" class="flex gap-0.5">
             <img
               v-for="p in team"
               :key="p.puuid"
               v-tip="gd.championName(p.championId)"
               :src="gd.championIcon(p.championId)"
-              class="icon-hover size-5 rounded bg-zinc-800"
+              class="icon-hover size-5 shrink-0 rounded bg-zinc-800"
               :class="p.puuid === puuid && 'ring-1 ring-amber-400'"
             />
           </div>

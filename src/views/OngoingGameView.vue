@@ -47,14 +47,14 @@ function championOf(puuid: string): number {
 </script>
 
 <template>
-  <section class="flex max-w-6xl flex-col gap-5">
-    <header class="page-header">
-      <div class="eyebrow">Live game</div>
-      <h1 class="page-title mt-1 flex items-center gap-3">
+  <section class="flex max-w-6xl flex-col gap-3">
+    <!-- One compact row: the five players are the point of this page. -->
+    <header class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+      <h1 class="flex items-center gap-2 text-lg font-semibold tracking-tight text-zinc-100">
         {{ title }}
         <span
           v-if="roster && roster.stage !== 'lobby'"
-          class="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-xs font-medium tracking-normal text-emerald-300"
+          class="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-[11px] font-medium text-emerald-300"
         >
           <span class="relative flex size-1.5">
             <span class="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-70" />
@@ -63,6 +63,33 @@ function championOf(puuid: string): number {
           实时
         </span>
       </h1>
+      <TransitionGroup
+        v-if="roster && insights?.advice.length"
+        name="list"
+        tag="div"
+        class="flex flex-wrap gap-1.5"
+        appear
+      >
+        <div
+          v-for="(a, i) in insights.advice"
+          :key="a.title + a.puuid"
+          v-tip="{ title: a.title, body: a.detail }"
+          :style="{ transitionDelay: `${i * 50}ms` }"
+          class="flex cursor-default items-center gap-1.5 rounded-lg border py-0.5 pr-2 pl-0.5 text-xs font-medium text-zinc-200 backdrop-blur-md"
+          :class="ADVICE_TONE[a.tone]"
+        >
+          <img
+            v-if="championOf(a.puuid) > 0"
+            :src="gd.championIcon(championOf(a.puuid))"
+            class="size-5 shrink-0 rounded-md bg-zinc-800"
+          />
+          {{ a.title }}
+        </div>
+      </TransitionGroup>
+      <span v-else-if="roster && !insights" class="flex items-center gap-2 text-xs text-zinc-500">
+        <span class="size-3 animate-spin rounded-full border-2 border-zinc-600 border-t-amber-400" />
+        正在分析双方战绩与对线数据…
+      </span>
     </header>
 
     <p v-if="!lcu.connected" class="empty-state">连接英雄联盟客户端后显示对局信息。</p>
@@ -71,34 +98,10 @@ function championOf(puuid: string): number {
     </p>
 
     <template v-else>
-      <TransitionGroup v-if="insights?.advice.length" name="list" tag="div" class="grid grid-cols-2 gap-2" appear>
-        <div
-          v-for="(a, i) in insights.advice"
-          :key="a.title + a.puuid"
-          :style="{ transitionDelay: `${i * 50}ms` }"
-          class="flex items-start gap-3 rounded-xl border p-3 backdrop-blur-md transition-transform duration-300 ease-out-expo hover:-translate-y-0.5"
-          :class="ADVICE_TONE[a.tone]"
-        >
-          <img
-            v-if="championOf(a.puuid) > 0"
-            :src="gd.championIcon(championOf(a.puuid))"
-            class="size-9 shrink-0 rounded-lg bg-zinc-800 ring-1 ring-white/10"
-          />
-          <div class="min-w-0">
-            <div class="text-sm font-semibold text-zinc-100">{{ a.title }}</div>
-            <div class="text-xs leading-5 text-zinc-400">{{ a.detail }}</div>
-          </div>
-        </div>
-      </TransitionGroup>
-      <p v-else-if="!insights" class="flex items-center gap-2 text-xs text-zinc-500">
-        <span class="size-3 animate-spin rounded-full border-2 border-zinc-600 border-t-amber-400" />
-        正在分析双方战绩与对线数据…
-      </p>
-
-      <div class="grid grid-cols-2 gap-6">
-        <div class="stagger flex flex-col gap-2">
-          <h2 class="flex items-center gap-2 px-1 text-sm font-semibold text-sky-300">
-            <span class="h-3.5 w-1 rounded-full bg-sky-400 shadow-[0_0_10px_rgb(56_189_248/0.7)]" />
+      <div class="grid grid-cols-2 gap-5">
+        <div class="stagger flex flex-col gap-1.5">
+          <h2 class="flex items-center gap-2 px-1 text-xs font-semibold text-sky-300">
+            <span class="h-3 w-1 rounded-full bg-sky-400 shadow-[0_0_10px_rgb(56_189_248/0.7)]" />
             {{ roster.stage === "lobby" ? "房间成员" : "我方" }}
           </h2>
           <PlayerCard
@@ -130,15 +133,15 @@ function championOf(puuid: string): number {
           </div>
         </div>
 
-        <div class="stagger flex flex-col gap-2">
+        <div class="stagger flex flex-col gap-1.5">
           <ChampionAssistant
             v-if="roster.stage === 'champSelect'"
             :position="me?.position ?? ''"
             :champion-id="me?.championId ?? 0"
             :enemy-champions="roster.enemyChampions"
           />
-          <h2 v-else class="flex items-center gap-2 px-1 text-sm font-semibold text-red-300">
-            <span class="h-3.5 w-1 rounded-full bg-red-400 shadow-[0_0_10px_rgb(248_113_113/0.7)]" />
+          <h2 v-else class="flex items-center gap-2 px-1 text-xs font-semibold text-red-300">
+            <span class="h-3 w-1 rounded-full bg-red-400 shadow-[0_0_10px_rgb(248_113_113/0.7)]" />
             敌方
           </h2>
           <PlayerCard

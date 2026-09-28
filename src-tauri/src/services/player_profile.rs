@@ -1018,6 +1018,8 @@ mod tests {
             metrics: None,
             participants: Vec::new(),
             comparison: None,
+            badge: None,
+            augments: Vec::new(),
         }
     }
 

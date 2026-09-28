@@ -159,6 +159,28 @@ pub struct LcuParticipantStats {
     pub wards_killed: i64,
     pub vision_wards_bought_in_game: i64,
     pub time_c_cing_others: i64,
+    /// Arena and ARAM: Mayhem augments in pick order; 0 for empty slots.
+    pub player_augment1: i64,
+    pub player_augment2: i64,
+    pub player_augment3: i64,
+    pub player_augment4: i64,
+    pub player_augment5: i64,
+    pub player_augment6: i64,
+}
+
+impl LcuParticipantStats {
+    /// Picked augments in order, empty slots left out.
+    pub fn augments(&self) -> Vec<i64> {
+        let slots = [
+            self.player_augment1,
+            self.player_augment2,
+            self.player_augment3,
+            self.player_augment4,
+            self.player_augment5,
+            self.player_augment6,
+        ];
+        slots.into_iter().filter(|&id| id > 0).collect()
+    }
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -200,6 +222,18 @@ pub struct LcuIconAsset {
     pub short_desc: String,
     /// Items: total cost in gold.
     pub price_total: i64,
+}
+
+/// Entries of `cherry-augments.json`: Arena and ARAM: Mayhem augments.
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct LcuAugment {
+    pub id: i64,
+    #[serde(rename = "nameTRA")]
+    pub name: String,
+    pub augment_small_icon_path: String,
+    /// `kPrismatic`, `kGold`, `kSilver`, ...
+    pub rarity: String,
 }
 
 /// `/lol-game-data/assets/v1/perkstyles.json`

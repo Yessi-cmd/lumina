@@ -88,6 +88,17 @@ pub struct GameSummary {
     /// The player against the others in the same game (SGP only). Matchmaking puts
     /// players of similar rank together, so this doubles as a same-rank comparison.
     pub comparison: Option<Comparison>,
+    /// Best of the winning (MVP) or losing (SVP) team; SGP only, not in Arena.
+    pub badge: Option<Badge>,
+    /// Arena and ARAM: Mayhem augments in pick order.
+    pub augments: Vec<i64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Badge {
+    Mvp,
+    Svp,
 }
 
 /// Per-minute performance of one player, or an average over several.
@@ -328,6 +339,12 @@ fn sgp_summary(game: SgpGameJson, puuid: &str) -> Option<GameSummary> {
     } else {
         Some(comparison(all, p, game.game_duration))
     };
+    let counted = matches!(result, GameResult::Win | GameResult::Loss);
+    let badge = if arena || !counted {
+        None
+    } else {
+        team_badge(all, p)
+    };
     let participants = all
         .iter()
         .map(|p| GameParticipant {
@@ -366,7 +383,60 @@ fn sgp_summary(game: SgpGameJson, puuid: &str) -> Option<GameSummary> {
         metrics,
         participants,
         comparison,
+        badge,
+        augments: p.augments(),
     })
+}
+
+/// MVP when `me` rates best on the winning team, SVP when best on the losing one.
+fn team_badge(all: &[SgpParticipant], me: &SgpParticipant) -> Option<Badge> {
+    let scores = performance_scores(all);
+    let own = scores.iter().find(|(p, _)| p.puuid == me.puuid)?.1;
+    let beaten = scores
+        .iter()
+        .filter(|(p, _)| p.team_id == me.team_id && p.puuid != me.puuid)
+        .all(|(_, score)| own > *score);
+    if !beaten {
+        None
+    } else if me.win {
+        Some(Badge::Mvp)
+    } else {
+        Some(Badge::Svp)
+    }
+}
+
+/// Everyone's rating in one game. Each stat is scaled by the game's best value, so
+/// the weights (summing to 1) compare roles fairly: KDA 0.3, kill participation 0.2,
+/// damage 0.2, damage taken and mitigated 0.1, gold 0.1, vision 0.1.
+fn performance_scores(all: &[SgpParticipant]) -> Vec<(&SgpParticipant, f64)> {
+    let mut team_kills: HashMap<i64, i64> = HashMap::new();
+    for p in all {
+        *team_kills.entry(p.team_id).or_default() += p.kills;
+    }
+    let scaled: [(f64, fn(&SgpParticipant) -> f64); 5] = [
+        (0.3, |p| (p.kills + p.assists) as f64 / p.deaths.max(1) as f64),
+        (0.2, |p| p.total_damage_dealt_to_champions as f64),
+        (0.1, |p| (p.total_damage_taken + p.damage_self_mitigated) as f64),
+        (0.1, |p| p.gold_earned as f64),
+        (0.1, |p| p.vision_score as f64),
+    ];
+    let mut tops = Vec::new();
+    for (_, stat) in &scaled {
+        tops.push(all.iter().map(stat).fold(0.0, f64::max));
+    }
+
+    let mut out = Vec::new();
+    for p in all {
+        let team = team_kills.get(&p.team_id).copied().unwrap_or(0);
+        let mut score = 0.2 * ratio(p.kills + p.assists, team);
+        for ((weight, stat), top) in scaled.iter().zip(&tops) {
+            if *top > 0.0 {
+                score += weight * stat(p) / top;
+            }
+        }
+        out.push((p, score));
+    }
+    out
 }
 
 fn comparison(all: &[SgpParticipant], me: &SgpParticipant, duration: i64) -> Comparison {
@@ -522,6 +592,8 @@ fn lcu_summary(game: LcuGame, puuid: &str) -> Option<GameSummary> {
         metrics: None,
         participants: Vec::new(),
         comparison: None,
+        badge: None,
+        augments: s.augments(),
     })
 }
 
@@ -580,6 +652,32 @@ mod tests {
         assert_eq!(s.items[0], 3157);
         assert_eq!(s.result, GameResult::Win);
         assert_eq!(s.position, "MIDDLE");
+    }
+
+    #[test]
+    fn badges_best_player_of_each_team() {
+        let json = r#"{"games":[{"metadata":{},"json":{
+            "gameId":9,"queueId":2400,"gameMode":"KIWI","gameDuration":1200,
+            "endOfGameResult":"GameComplete","participants":[
+              {"puuid":"carry","teamId":100,"win":true,"kills":12,"deaths":2,"assists":8,
+               "totalDamageDealtToChampions":40000,"goldEarned":14000,
+               "playerAugment1":1205,"playerAugment2":0,"playerAugment3":1301},
+              {"puuid":"mate","teamId":100,"win":true,"kills":2,"deaths":6,"assists":5,
+               "totalDamageDealtToChampions":12000,"goldEarned":9000},
+              {"puuid":"ace","teamId":200,"win":false,"kills":7,"deaths":5,"assists":4,
+               "totalDamageDealtToChampions":30000,"goldEarned":11000},
+              {"puuid":"feeder","teamId":200,"win":false,"kills":0,"deaths":10,"assists":2,
+               "totalDamageDealtToChampions":8000,"goldEarned":7000}]}}]}"#;
+        let summary = |puuid: &str| {
+            let history: SgpMatchHistory = serde_json::from_str(json).unwrap();
+            let game = history.games.into_iter().next().unwrap().json;
+            sgp_summary(game, puuid).unwrap()
+        };
+        assert_eq!(summary("carry").badge, Some(Badge::Mvp));
+        assert_eq!(summary("mate").badge, None);
+        assert_eq!(summary("ace").badge, Some(Badge::Svp));
+        assert_eq!(summary("feeder").badge, None);
+        assert_eq!(summary("carry").augments, vec![1205, 1301]);
     }
 
     #[test]

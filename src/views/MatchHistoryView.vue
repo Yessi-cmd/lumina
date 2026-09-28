@@ -21,7 +21,21 @@ const QUEUES: { id: number; label: string }[] = [
   { id: 430, label: "匹配（自选）" },
   { id: 450, label: "极地大乱斗" },
   { id: 1700, label: "斗魂竞技场" },
+  { id: 2400, label: "海克斯大乱斗" },
 ];
+
+type Outcome = "all" | "win" | "loss" | "mvp" | "svp";
+const OUTCOMES: { id: Outcome; label: string }[] = [
+  { id: "all", label: "全部" },
+  { id: "win", label: "胜利" },
+  { id: "loss", label: "失败" },
+  { id: "mvp", label: "MVP" },
+  { id: "svp", label: "SVP" },
+];
+/** Champion and outcome filters run on loaded games, so a narrow filter keeps loading
+ * older pages until it has this many games, up to AUTO_LOAD_LIMIT games in total. */
+const AUTO_FILL = 10;
+const AUTO_LOAD_LIMIT = 200;
 
 const lcu = useLcuStore();
 const gd = useGameDataStore();
@@ -51,10 +65,42 @@ const championOptions = computed(() => {
   return options.sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, "zh-CN"));
 });
 
+const outcomeFilter = ref<Outcome>("all");
+
+function matchesOutcome(g: GameSummary, outcome: Outcome): boolean {
+  switch (outcome) {
+    case "all":
+      return true;
+    case "win":
+    case "loss":
+      return g.result === outcome;
+    case "mvp":
+    case "svp":
+      return g.badge === outcome;
+  }
+}
+
 const shown = computed(() => {
   const champion = championFilter.value;
-  return champion === null ? games.value : games.value.filter((g) => g.championId === champion);
+  const outcome = outcomeFilter.value;
+  return games.value.filter(
+    (g) => (champion === null || g.championId === champion) && matchesOutcome(g, outcome),
+  );
 });
+
+/** Filters applied to loaded games rather than by the server. */
+const localFilter = computed(() => championFilter.value !== null || outcomeFilter.value !== "all");
+
+// Keep paging back while a local filter has too few games to show.
+watch(
+  () => [localFilter.value, shown.value.length, loading.value, hasMore.value] as const,
+  ([filtered, count, busy, more]) => {
+    const room = games.value.length < AUTO_LOAD_LIMIT && !error.value;
+    if (filtered && !busy && more && room && count < AUTO_FILL) {
+      loadMore();
+    }
+  },
+);
 
 /** Win rate and KDA of the shown games; remakes do not count. */
 const summary = computed(() => {
@@ -94,6 +140,7 @@ function onQueueChange() {
 
 function clearFilters() {
   championFilter.value = null;
+  outcomeFilter.value = "all";
   if (queueFilter.value === null) return;
   queueFilter.value = null;
   onQueueChange();
@@ -317,16 +364,34 @@ watch(
         <option :value="null">全部英雄</option>
         <option v-for="c in championOptions" :key="c.id" :value="c.id">{{ c.name }}（{{ c.n }}）</option>
       </select>
+      <div class="segmented">
+        <button
+          v-for="o in OUTCOMES"
+          :key="o.id"
+          class="segment px-3"
+          :class="outcomeFilter === o.id && 'segment-active'"
+          @click="outcomeFilter = o.id"
+        >
+          {{ o.label }}
+        </button>
+      </div>
       <button
-        v-if="queueFilter !== null || championFilter !== null"
+        v-if="queueFilter !== null || localFilter"
         class="btn btn-ghost py-1"
         @click="clearFilters"
       >
         <AppIcon name="close" :size="14" />
         清除筛选
       </button>
-      <span v-if="championFilter !== null && hasMore" class="ml-auto text-xs text-zinc-500">
-        英雄筛选只在已加载的 {{ games.length }} 场里找，点底部“加载更多”可以往前翻。
+      <span v-if="localFilter" class="ml-auto text-xs text-zinc-500">
+        <template v-if="source === 'lcu' && (outcomeFilter === 'mvp' || outcomeFilter === 'svp')">
+          MVP/SVP 需要 SGP 数据，当前来源没有。
+        </template>
+        <template v-else>
+          在已加载的 {{ games.length }} 场中找到 {{ shown.length }} 场{{
+            hasMore ? (loading ? "，继续往前翻…" : "，点底部“加载更多”继续往前翻") : ""
+          }}
+        </template>
       </span>
     </div>
 
@@ -346,7 +411,7 @@ watch(
     </div>
 
     <p v-if="summoner && !loading && shown.length === 0 && !error" class="empty-state">
-      {{ games.length === 0 ? "没有找到对局记录。" : "已加载的对局里没有这个英雄。" }}
+      {{ games.length === 0 ? "没有找到对局记录。" : "已加载的对局里没有符合筛选的记录。" }}
     </p>
 
     <button

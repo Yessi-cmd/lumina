@@ -81,6 +81,10 @@ export interface GameSummary {
   participants: { puuid: string; teamId: number; championId: number }[];
   /** Against the other players of the game (SGP only); `opponent` is the same position. */
   comparison: { me: Rates; peers: Rates; opponent: Rates | null } | null;
+  /** Best of the winning (MVP) or losing (SVP) team; SGP only, not in Arena. */
+  badge: "mvp" | "svp" | null;
+  /** Arena and ARAM: Mayhem augments in pick order. */
+  augments: number[];
 }
 
 /** Shares are fractions of the team total (0.25 = 25%). */
@@ -121,6 +125,8 @@ export interface GameData {
   items: Record<string, Described>;
   spells: Record<string, Described>;
   perkDescriptions: Record<string, string>;
+  /** Arena and ARAM: Mayhem augments; empty when the client does not ship them. */
+  augments: Record<string, { name: string; icon: string; rarity: string }>;
 }
 
 export interface Described {
@@ -319,6 +325,8 @@ export interface PlayerLine {
   multiKills: number[];
   firstBlood: boolean;
   position: string;
+  /** Arena and ARAM: Mayhem augments in pick order. */
+  augments: number[];
 }
 
 export interface GameRunes {

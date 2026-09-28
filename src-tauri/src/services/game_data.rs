@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use serde::Serialize;
 
 use crate::clients::lcu::http::LcuHttp;
-use crate::clients::lcu::models::{LcuChampion, LcuIconAsset, LcuPerkStyles, LcuQueue};
+use crate::clients::lcu::models::{LcuAugment, LcuChampion, LcuIconAsset, LcuPerkStyles, LcuQueue};
 use crate::error::Result;
 use crate::state::session::LcuSession;
 
@@ -15,6 +15,7 @@ const SPELLS: &str = "/lol-game-data/assets/v1/summoner-spells.json";
 const QUEUES: &str = "/lol-game-queues/v1/queues";
 const PERKS: &str = "/lol-game-data/assets/v1/perks.json";
 const PERK_STYLES: &str = "/lol-game-data/assets/v1/perkstyles.json";
+const AUGMENTS: &str = "/lol-game-data/assets/v1/cherry-augments.json";
 
 /// Icon values are LCU asset paths, served to the webview through `lcu-asset://`.
 #[derive(Debug, Clone, Serialize)]
@@ -31,6 +32,17 @@ pub struct GameData {
     pub items: HashMap<i64, Described>,
     pub spells: HashMap<i64, Described>,
     pub perk_descriptions: HashMap<i64, String>,
+    /// Arena and ARAM: Mayhem augments; empty when the client does not ship them.
+    pub augments: HashMap<i64, Augment>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Augment {
+    pub name: String,
+    pub icon: String,
+    /// `prismatic`, `gold`, `silver` or empty.
+    pub rarity: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -112,7 +124,30 @@ async fn fetch(http: &LcuHttp) -> Result<GameData> {
         items: item_info,
         spells: spell_info,
         perk_descriptions,
+        augments: augments(http).await,
     })
+}
+
+/// Optional: a client without the file still gets every other table.
+async fn augments(http: &LcuHttp) -> HashMap<i64, Augment> {
+    let list = match http.get::<Vec<LcuAugment>>(AUGMENTS).await {
+        Ok(list) => list,
+        Err(err) => {
+            log::warn!("augments unavailable: {err}");
+            return HashMap::new();
+        }
+    };
+    let mut out = HashMap::new();
+    for a in list.into_iter().filter(|a| a.id > 0) {
+        let rarity = a.rarity.trim_start_matches('k').to_ascii_lowercase();
+        let augment = Augment {
+            name: a.name,
+            icon: a.augment_small_icon_path,
+            rarity,
+        };
+        out.insert(a.id, augment);
+    }
+    out
 }
 
 fn icons(assets: &[LcuIconAsset]) -> HashMap<i64, String> {

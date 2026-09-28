@@ -117,7 +117,7 @@ function openHistory() {
 
 <template>
   <div
-    class="group flex w-full cursor-pointer items-start gap-3 rounded-xl border bg-zinc-900/65 px-3 py-2.5 backdrop-blur-md transition-[background-color,border-color,transform,box-shadow] duration-300 ease-out-expo hover:-translate-y-0.5 hover:bg-zinc-800/60 hover:shadow-[0_16px_36px_-20px_rgb(0_0_0/0.9)] active:translate-y-0 active:scale-[0.995]"
+    class="group flex w-full cursor-pointer items-start gap-3 rounded-xl border bg-zinc-900/65 px-3 py-2 backdrop-blur-md transition-[background-color,border-color,transform,box-shadow] duration-300 ease-out-expo hover:-translate-y-0.5 hover:bg-zinc-800/60 hover:shadow-[0_16px_36px_-20px_rgb(0_0_0/0.9)] active:translate-y-0 active:scale-[0.995]"
     :class="
       player.isSelf
         ? 'animate-glow border-amber-400/40 bg-linear-to-r from-amber-500/[0.08] to-zinc-900/65 shadow-[0_0_0_1px_rgb(245_158_11/0.1),0_8px_24px_-14px_rgb(245_158_11/0.5)]'

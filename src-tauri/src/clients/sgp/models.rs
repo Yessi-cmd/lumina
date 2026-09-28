@@ -147,6 +147,28 @@ pub struct SgpParticipant {
     pub wards_killed: i64,
     pub vision_wards_bought_in_game: i64,
     pub time_c_cing_others: i64,
+    /// Arena and ARAM: Mayhem augments in pick order; 0 for empty slots.
+    pub player_augment1: i64,
+    pub player_augment2: i64,
+    pub player_augment3: i64,
+    pub player_augment4: i64,
+    pub player_augment5: i64,
+    pub player_augment6: i64,
+}
+
+impl SgpParticipant {
+    /// Picked augments in order, empty slots left out.
+    pub fn augments(&self) -> Vec<i64> {
+        let slots = [
+            self.player_augment1,
+            self.player_augment2,
+            self.player_augment3,
+            self.player_augment4,
+            self.player_augment5,
+            self.player_augment6,
+        ];
+        slots.into_iter().filter(|&id| id > 0).collect()
+    }
 }
 
 /// match-v5 `challenges`; values may be fractional, so they are read as floats.

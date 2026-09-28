@@ -347,6 +347,8 @@ mod tests {
             metrics: None,
             participants,
             comparison: None,
+            badge: None,
+            augments: Vec::new(),
         }
     }
 

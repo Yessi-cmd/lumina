@@ -396,10 +396,21 @@ function purchaseGroups(build: PlayerBuild): { minute: number; items: number[] }
                       v-if="gd.itemIcon(item)"
                       v-tip="gd.itemTip(item)"
                       :src="gd.itemIcon(item)"
-                      class="icon-hover size-6 rounded-md bg-zinc-800"
+                      class="icon-hover size-6 shrink-0 rounded-md bg-zinc-800"
                       :class="i === 6 && 'rounded-full'"
                     />
-                    <div v-else class="size-6 rounded-md bg-zinc-900" :class="i === 6 && 'rounded-full'" />
+                    <div v-else class="size-6 shrink-0 rounded-md bg-zinc-900" :class="i === 6 && 'rounded-full'" />
+                  </template>
+                </div>
+                <div v-if="p.augments.length" class="mt-0.5 flex justify-end gap-0.5">
+                  <template v-for="a in p.augments" :key="a">
+                    <img
+                      v-if="gd.augmentIcon(a)"
+                      v-tip="gd.augmentTip(a)"
+                      :src="gd.augmentIcon(a)"
+                      class="icon-hover size-5 shrink-0 rounded bg-zinc-950 ring-1 ring-white/10"
+                    />
+                    <div v-else v-tip="gd.augmentTip(a)" class="size-5 shrink-0 rounded bg-zinc-800" />
                   </template>
                 </div>
               </td>

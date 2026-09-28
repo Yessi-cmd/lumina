@@ -89,6 +89,8 @@ pub struct PlayerLine {
     pub multi_kills: [i64; 4],
     pub first_blood: bool,
     pub position: String,
+    /// Arena and ARAM: Mayhem augments in pick order.
+    pub augments: Vec<i64>,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -271,6 +273,7 @@ fn sgp_line(p: &SgpParticipant) -> PlayerLine {
         ],
         first_blood: p.first_blood_kill,
         position: p.team_position.clone(),
+        augments: p.augments(),
     }
 }
 
@@ -366,6 +369,7 @@ fn lcu_line(s: &LcuParticipantStats) -> PlayerLine {
         ],
         first_blood: s.first_blood_kill,
         position: String::new(),
+        augments: s.augments(),
     }
 }
 
