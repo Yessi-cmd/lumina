@@ -414,9 +414,13 @@ fn performance_scores(all: &[SgpParticipant]) -> Vec<(&SgpParticipant, f64)> {
         *team_kills.entry(p.team_id).or_default() += p.kills;
     }
     let scaled: [(f64, fn(&SgpParticipant) -> f64); 5] = [
-        (0.3, |p| (p.kills + p.assists) as f64 / p.deaths.max(1) as f64),
+        (0.3, |p| {
+            (p.kills + p.assists) as f64 / p.deaths.max(1) as f64
+        }),
         (0.2, |p| p.total_damage_dealt_to_champions as f64),
-        (0.1, |p| (p.total_damage_taken + p.damage_self_mitigated) as f64),
+        (0.1, |p| {
+            (p.total_damage_taken + p.damage_self_mitigated) as f64
+        }),
         (0.1, |p| p.gold_earned as f64),
         (0.1, |p| p.vision_score as f64),
     ];
