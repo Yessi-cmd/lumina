@@ -405,6 +405,9 @@ fn team_badge(all: &[SgpParticipant], me: &SgpParticipant) -> Option<Badge> {
     }
 }
 
+/// One number read off a participant.
+type Stat = fn(&SgpParticipant) -> f64;
+
 /// Everyone's rating in one game. Each stat is scaled by the game's best value, so
 /// the weights (summing to 1) compare roles fairly: KDA 0.3, kill participation 0.2,
 /// damage 0.2, damage taken and mitigated 0.1, gold 0.1, vision 0.1.
@@ -413,7 +416,7 @@ fn performance_scores(all: &[SgpParticipant]) -> Vec<(&SgpParticipant, f64)> {
     for p in all {
         *team_kills.entry(p.team_id).or_default() += p.kills;
     }
-    let scaled: [(f64, fn(&SgpParticipant) -> f64); 5] = [
+    let scaled: [(f64, Stat); 5] = [
         (0.3, |p| {
             (p.kills + p.assists) as f64 / p.deaths.max(1) as f64
         }),
