@@ -176,7 +176,7 @@ const maxPositionGames = computed(() => Math.max(1, ...(c.value?.positions.map((
         <p v-if="c.games === 0" class="empty-state">这个范围里没有对局。</p>
         <template v-else>
           <!-- Headline numbers -->
-          <div class="grid grid-cols-3 gap-3 lg:grid-cols-6">
+          <div class="stagger grid grid-cols-3 gap-3 lg:grid-cols-6">
             <div class="card p-3">
               <div class="eyebrow">场次</div>
               <div class="mt-1 text-2xl font-semibold text-zinc-50 tabular-nums">{{ c.games }}</div>
@@ -192,7 +192,7 @@ const maxPositionGames = computed(() => Math.max(1, ...(c.value?.positions.map((
               </div>
               <div class="mt-1.5 h-1 overflow-hidden rounded-full bg-white/[0.06]">
                 <div
-                  class="h-1 rounded-full bg-emerald-500 transition-[width] duration-700 ease-out-expo"
+                  class="h-1 rounded-full bg-linear-to-r from-emerald-600 to-emerald-300 shadow-[0_0_8px_rgb(52_211_153/0.6)] transition-[width] duration-1000 ease-out-expo"
                   :style="{ width: pct(winRate) }"
                 />
               </div>
@@ -225,7 +225,7 @@ const maxPositionGames = computed(() => Math.max(1, ...(c.value?.positions.map((
           <p v-if="c.truncated" class="-mt-2 text-xs text-zinc-500">只统计了最近 400 场，更早的对局没有读取。</p>
 
           <!-- Ranked -->
-          <div v-if="c.ranked.length" class="grid grid-cols-2 gap-3">
+          <div v-if="c.ranked.length" class="stagger grid grid-cols-2 gap-3">
             <div v-for="q in c.ranked" :key="q.queue" class="card flex items-center gap-4 p-4">
               <div class="min-w-0 flex-1">
                 <div class="eyebrow">{{ q.queue === "solo" ? "单双排" : "灵活排位" }}</div>

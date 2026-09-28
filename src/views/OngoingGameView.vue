@@ -48,7 +48,7 @@ function championOf(puuid: string): number {
 
 <template>
   <section class="flex max-w-6xl flex-col gap-5">
-    <header>
+    <header class="page-header">
       <div class="eyebrow">Live game</div>
       <h1 class="page-title mt-1 flex items-center gap-3">
         {{ title }}
@@ -56,7 +56,10 @@ function championOf(puuid: string): number {
           v-if="roster && roster.stage !== 'lobby'"
           class="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-xs font-medium tracking-normal text-emerald-300"
         >
-          <span class="size-1.5 animate-pulse rounded-full bg-emerald-400" />
+          <span class="relative flex size-1.5">
+            <span class="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-70" />
+            <span class="relative size-1.5 rounded-full bg-emerald-400" />
+          </span>
           实时
         </span>
       </h1>
@@ -73,7 +76,7 @@ function championOf(puuid: string): number {
           v-for="(a, i) in insights.advice"
           :key="a.title + a.puuid"
           :style="{ transitionDelay: `${i * 50}ms` }"
-          class="flex items-start gap-3 rounded-xl border p-3"
+          class="flex items-start gap-3 rounded-xl border p-3 backdrop-blur-md transition-transform duration-300 ease-out-expo hover:-translate-y-0.5"
           :class="ADVICE_TONE[a.tone]"
         >
           <img
@@ -93,9 +96,9 @@ function championOf(puuid: string): number {
       </p>
 
       <div class="grid grid-cols-2 gap-6">
-        <div class="flex flex-col gap-2">
+        <div class="stagger flex flex-col gap-2">
           <h2 class="flex items-center gap-2 px-1 text-sm font-semibold text-sky-300">
-            <span class="h-3.5 w-1 rounded-full bg-sky-400" />
+            <span class="h-3.5 w-1 rounded-full bg-sky-400 shadow-[0_0_10px_rgb(56_189_248/0.7)]" />
             {{ roster.stage === "lobby" ? "房间成员" : "我方" }}
           </h2>
           <PlayerCard
@@ -127,7 +130,7 @@ function championOf(puuid: string): number {
           </div>
         </div>
 
-        <div class="flex flex-col gap-2">
+        <div class="stagger flex flex-col gap-2">
           <ChampionAssistant
             v-if="roster.stage === 'champSelect'"
             :position="me?.position ?? ''"
@@ -135,7 +138,7 @@ function championOf(puuid: string): number {
             :enemy-champions="roster.enemyChampions"
           />
           <h2 v-else class="flex items-center gap-2 px-1 text-sm font-semibold text-red-300">
-            <span class="h-3.5 w-1 rounded-full bg-red-400" />
+            <span class="h-3.5 w-1 rounded-full bg-red-400 shadow-[0_0_10px_rgb(248_113_113/0.7)]" />
             敌方
           </h2>
           <PlayerCard

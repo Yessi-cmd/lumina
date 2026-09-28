@@ -14,21 +14,23 @@ const props = defineProps<{
 const gd = useGameDataStore();
 const expanded = ref(false);
 
-const RESULT: Record<GameResult, { label: string; bar: string; text: string; bg: string }> = {
+const RESULT: Record<GameResult, { label: string; bar: string; text: string; bg: string; glow: string }> = {
   win: {
     label: "胜利",
-    bar: "bg-linear-to-b from-emerald-300 to-emerald-500",
+    bar: "bg-linear-to-b from-emerald-300 to-emerald-500 shadow-[0_0_10px_1px_rgb(16_185_129/0.55)]",
     text: "text-emerald-400",
-    bg: "bg-linear-to-r from-emerald-500/[0.09] via-transparent to-transparent",
+    bg: "bg-linear-to-r from-emerald-500/[0.12] via-emerald-500/[0.02] to-transparent",
+    glow: "hover:shadow-[0_14px_34px_-18px_rgb(16_185_129/0.55)]",
   },
   loss: {
     label: "失败",
-    bar: "bg-linear-to-b from-red-300 to-red-500",
+    bar: "bg-linear-to-b from-red-300 to-red-500 shadow-[0_0_10px_1px_rgb(239_68_68/0.5)]",
     text: "text-red-400",
-    bg: "bg-linear-to-r from-red-500/[0.09] via-transparent to-transparent",
+    bg: "bg-linear-to-r from-red-500/[0.12] via-red-500/[0.02] to-transparent",
+    glow: "hover:shadow-[0_14px_34px_-18px_rgb(239_68_68/0.5)]",
   },
-  remake: { label: "重开", bar: "bg-zinc-500", text: "text-zinc-400", bg: "" },
-  abort: { label: "中止", bar: "bg-zinc-600", text: "text-zinc-500", bg: "" },
+  remake: { label: "重开", bar: "bg-zinc-500", text: "text-zinc-400", bg: "", glow: "" },
+  abort: { label: "中止", bar: "bg-zinc-600", text: "text-zinc-500", bg: "", glow: "" },
 };
 const MULTI_KILL: Record<number, string> = { 2: "双杀", 3: "三杀", 4: "四杀", 5: "五杀" };
 const POSITIONS: Record<string, string> = {
@@ -93,10 +95,12 @@ const lineup = computed(() => {
 
 <template>
   <div
-    class="overflow-hidden rounded-xl border bg-zinc-900/70 transition-[border-color,box-shadow] duration-300 ease-out-expo"
+    class="overflow-hidden rounded-xl border bg-zinc-900/70 backdrop-blur-sm transition-[border-color,box-shadow,transform] duration-300 ease-out-expo"
     :class="[
       result.bg,
-      expanded ? 'border-white/10 shadow-lg shadow-black/30' : 'border-white/[0.04] hover:border-white/10',
+      expanded
+        ? 'border-white/10 shadow-xl shadow-black/40'
+        : ['border-white/[0.05] hover:-translate-y-0.5 hover:border-white/[0.12]', result.glow],
     ]"
   >
     <div
@@ -124,7 +128,7 @@ const lineup = computed(() => {
         <div class="relative" v-tip="gd.championName(game.championId)">
           <img
             :src="gd.championIcon(game.championId)"
-            class="size-12 rounded-xl bg-zinc-800 ring-1 ring-white/10 transition-transform duration-300 ease-out-expo group-hover/row:scale-105"
+            class="size-12 rounded-xl bg-zinc-800 ring-1 ring-white/10 transition-transform duration-500 ease-spring group-hover/row:scale-110 group-hover/row:-rotate-3"
           />
           <span
             class="absolute -right-1 -bottom-1 rounded-md border border-white/10 bg-zinc-950 px-1 text-[10px] text-zinc-300 tabular-nums"
@@ -171,7 +175,7 @@ const lineup = computed(() => {
           </span>
           <span
             v-if="multiKill"
-            class="rounded-md bg-linear-to-r from-rose-500 to-orange-500 px-1.5 py-px text-[11px] font-medium text-white"
+            class="rounded-md bg-linear-to-r from-rose-500 via-orange-500 to-amber-400 bg-[length:200%_100%] px-1.5 py-px text-[11px] font-semibold text-white shadow-[0_0_12px_-2px_rgb(244_63_94/0.7)] animate-shimmer"
           >
             {{ multiKill }}
           </span>

@@ -117,11 +117,11 @@ function openHistory() {
 
 <template>
   <div
-    class="group flex w-full cursor-pointer items-start gap-3 rounded-xl border bg-zinc-900/75 px-3 py-2.5 transition-[background-color,border-color,transform,box-shadow] duration-300 ease-out-expo hover:-translate-y-px hover:bg-zinc-800/60 active:translate-y-0"
+    class="group flex w-full cursor-pointer items-start gap-3 rounded-xl border bg-zinc-900/65 px-3 py-2.5 backdrop-blur-md transition-[background-color,border-color,transform,box-shadow] duration-300 ease-out-expo hover:-translate-y-0.5 hover:bg-zinc-800/60 hover:shadow-[0_16px_36px_-20px_rgb(0_0_0/0.9)] active:translate-y-0 active:scale-[0.995]"
     :class="
       player.isSelf
-        ? 'border-amber-400/40 shadow-[0_0_0_1px_rgb(245_158_11/0.1),0_8px_24px_-14px_rgb(245_158_11/0.5)]'
-        : 'border-white/[0.06] hover:border-white/10'
+        ? 'animate-glow border-amber-400/40 bg-linear-to-r from-amber-500/[0.08] to-zinc-900/65 shadow-[0_0_0_1px_rgb(245_158_11/0.1),0_8px_24px_-14px_rgb(245_158_11/0.5)]'
+        : 'border-white/[0.06] hover:border-white/[0.12]'
     "
     @click="openHistory"
   >
@@ -130,9 +130,9 @@ function openHistory() {
         v-if="player.championId > 0"
         :src="gd.championIcon(player.championId)"
         v-tip="gd.championName(player.championId)"
-        class="size-11 rounded-lg bg-zinc-800 ring-1 ring-white/10"
+        class="size-11 rounded-lg bg-zinc-800 ring-1 ring-white/10 transition-transform duration-500 ease-spring group-hover:scale-110 group-hover:-rotate-3"
       />
-      <div v-else class="size-11 rounded-lg bg-zinc-800 ring-1 ring-white/10" />
+      <div v-else class="skeleton size-11 rounded-lg ring-1 ring-white/10" />
       <span
         v-if="POSITIONS[player.position]"
         class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 rounded-md border border-white/10 bg-zinc-950 px-1 text-[10px] whitespace-nowrap text-zinc-300"
@@ -205,8 +205,9 @@ function openHistory() {
             <span
               v-for="(r, i) in profile.recent"
               :key="i"
-              class="size-2 rounded-full"
+              class="size-2 rounded-full transition-transform duration-300 ease-spring group-hover:scale-125"
               :class="DOT[r]"
+              :style="{ transitionDelay: `${i * 20}ms` }"
             />
           </div>
           <div class="flex gap-1">

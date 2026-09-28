@@ -30,8 +30,8 @@ function onDelayInput(event: Event) {
 </script>
 
 <template>
-  <section class="flex max-w-3xl flex-col gap-5">
-    <header>
+  <section class="stagger flex max-w-3xl flex-col gap-5">
+    <header class="page-header">
       <div class="eyebrow">Settings</div>
       <h1 class="page-title mt-1">设置</h1>
     </header>
@@ -41,8 +41,8 @@ function onDelayInput(event: Event) {
     <template v-else>
       <div>
         <h2 class="eyebrow mb-2 px-1">对局</h2>
-        <div class="card divide-y divide-white/[0.05]">
-          <div class="flex items-center justify-between gap-6 p-4">
+        <div class="card divide-y divide-white/[0.05] overflow-hidden">
+          <div class="flex items-center justify-between gap-6 p-4 transition-colors duration-200 hover:bg-white/[0.02]">
             <div>
               <div class="font-medium text-zinc-100">自动接受对局</div>
               <div class="mt-0.5 text-sm text-zinc-400">匹配成功后自动点击接受。倒计时期间可以在顶部横幅取消。</div>
@@ -60,16 +60,17 @@ function onDelayInput(event: Event) {
               class="flex-1 cursor-pointer accent-amber-500 disabled:cursor-not-allowed"
               :disabled="!s.autoAccept"
               :value="s.autoAcceptDelaySecs"
+              :style="{ '--fill': `${s.autoAcceptDelaySecs * 10}%` }"
               @change="onDelayInput"
             />
             <span
-              class="w-14 rounded-md bg-white/5 py-0.5 text-center text-sm text-zinc-200 tabular-nums"
+              class="w-14 rounded-md bg-amber-400/10 py-0.5 text-center text-sm font-medium text-amber-200 tabular-nums ring-1 ring-amber-400/20 ring-inset"
             >
               {{ s.autoAcceptDelaySecs }} 秒
             </span>
           </div>
 
-          <div class="flex items-center justify-between gap-6 p-4">
+          <div class="flex items-center justify-between gap-6 p-4 transition-colors duration-200 hover:bg-white/[0.02]">
             <div>
               <div class="font-medium text-zinc-100">自动弹出对局面板</div>
               <div class="mt-0.5 text-sm text-zinc-400">
@@ -82,7 +83,7 @@ function onDelayInput(event: Event) {
             />
           </div>
 
-          <div class="flex items-center justify-between gap-6 p-4">
+          <div class="flex items-center justify-between gap-6 p-4 transition-colors duration-200 hover:bg-white/[0.02]">
             <div>
               <div class="font-medium text-zinc-100">选人阶段悬浮窗</div>
               <div class="mt-0.5 text-sm text-zinc-400">
@@ -99,8 +100,8 @@ function onDelayInput(event: Event) {
 
       <div>
         <h2 class="eyebrow mb-2 px-1">英雄数据</h2>
-        <div class="card divide-y divide-white/[0.05]">
-          <div class="flex items-center justify-between gap-6 p-4">
+        <div class="card divide-y divide-white/[0.05] overflow-hidden">
+          <div class="flex items-center justify-between gap-6 p-4 transition-colors duration-200 hover:bg-white/[0.02]">
             <div>
               <div class="font-medium text-zinc-100">英雄数据分段</div>
               <div class="mt-0.5 text-sm text-zinc-400">选英雄助手的强度和出装按哪个分段统计（数据来自 lolalytics）。</div>
@@ -117,7 +118,7 @@ function onDelayInput(event: Event) {
             </select>
           </div>
 
-          <div class="flex items-center justify-between gap-6 p-4">
+          <div class="flex items-center justify-between gap-6 p-4 transition-colors duration-200 hover:bg-white/[0.02]">
             <div>
               <div class="font-medium text-zinc-100">克制关系分段</div>
               <div class="mt-0.5 text-sm text-zinc-400">

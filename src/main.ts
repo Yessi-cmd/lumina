@@ -17,5 +17,17 @@ if (label.startsWith("overlay-")) {
   const side = label === "overlay-allies" ? "allies" : "enemies";
   createApp(OverlayApp, { side }).use(createPinia()).directive("tip", vTip).mount("#app");
 } else {
+  // Cards light up where the pointer is: their spotlight reads --mx / --my.
+  document.addEventListener(
+    "pointermove",
+    (e) => {
+      const card = (e.target as Element | null)?.closest?.<HTMLElement>(".card");
+      if (!card) return;
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty("--mx", `${e.clientX - rect.left}px`);
+      card.style.setProperty("--my", `${e.clientY - rect.top}px`);
+    },
+    { passive: true },
+  );
   createApp(App).use(createPinia()).use(router).directive("tip", vTip).mount("#app");
 }

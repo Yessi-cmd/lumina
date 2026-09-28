@@ -38,13 +38,17 @@ watch(
     <div
       v-if="tooltip.content"
       ref="box"
-      class="pointer-events-none fixed top-0 left-0 z-50 max-w-72 rounded-lg border border-white/10 bg-zinc-900/95 px-3 py-2 text-xs shadow-xl shadow-black/50 backdrop-blur"
-      :class="glide && 'transition-transform duration-150 ease-out-expo'"
+      class="pointer-events-none fixed top-0 left-0 z-50 max-w-72"
+      :class="glide && 'transition-transform duration-200 ease-out-expo'"
       :style="{
         transform: `translate(${position.left}px, ${position.top}px)`,
         visibility: placed ? 'visible' : 'hidden',
       }"
     >
+      <!-- Inner box: the outer one's transform is taken by the position. -->
+      <div
+        class="animate-pop-in rounded-lg border border-white/10 bg-zinc-900/85 px-3 py-2 text-xs shadow-[inset_0_1px_0_0_rgb(255_255_255/0.06),0_18px_40px_-12px_rgb(0_0_0/0.8)] backdrop-blur-xl"
+      >
       <div class="font-medium text-zinc-50">{{ tooltip.content.title }}</div>
       <div v-if="tooltip.content.subtitle" class="mt-0.5 text-amber-300/90">{{ tooltip.content.subtitle }}</div>
       <div
@@ -52,6 +56,7 @@ watch(
         class="mt-1.5 border-t border-white/[0.06] pt-1.5 leading-5 whitespace-pre-line text-zinc-400"
       >
         {{ tooltip.content.body }}
+      </div>
       </div>
     </div>
   </Transition>

@@ -4,6 +4,7 @@ import { useRoute } from "vue-router";
 import { api, PANEL_HISTORY_COUNT, type DataSource, type GameSummary, type Summoner } from "../api";
 import CareerPanel from "../components/career/CareerPanel.vue";
 import AppIcon from "../components/common/AppIcon.vue";
+import CountUp from "../components/common/CountUp.vue";
 import MatchRow from "../components/match/MatchRow.vue";
 import { profileIconUrl, useGameDataStore } from "../stores/gameData";
 import { useLcuStore } from "../stores/lcu";
@@ -159,8 +160,8 @@ watch(
 </script>
 
 <template>
-  <section class="flex max-w-6xl flex-col gap-4">
-    <header class="flex items-end gap-4">
+  <section class="stagger flex max-w-6xl flex-col gap-4">
+    <header class="page-header flex items-end gap-4">
       <div>
         <div class="eyebrow">Match history</div>
         <h1 class="page-title mt-1">战绩</h1>
@@ -189,16 +190,26 @@ watch(
 
     <p v-if="!lcu.connected" class="empty-state">连接英雄联盟客户端后才能查询战绩。</p>
 
-    <div v-if="summoner" class="card relative overflow-hidden p-4">
-      <div class="pointer-events-none absolute -top-20 -left-10 size-56 rounded-full bg-amber-500/10 blur-3xl" />
+    <div v-if="summoner" class="card overflow-hidden p-4">
+      <div
+        class="pointer-events-none absolute -top-24 -left-12 size-64 rounded-full bg-[radial-gradient(closest-side,rgb(245_158_11/0.18),transparent)]"
+      />
+      <div
+        class="pointer-events-none absolute -right-10 -bottom-24 size-64 rounded-full transition-colors duration-700"
+        :class="
+          summary && summary.winRate >= 50
+            ? 'bg-[radial-gradient(closest-side,rgb(16_185_129/0.14),transparent)]'
+            : 'bg-[radial-gradient(closest-side,rgb(239_68_68/0.12),transparent)]'
+        "
+      />
       <div class="relative flex items-center gap-4">
         <div class="relative shrink-0">
           <img
             :src="profileIconUrl(summoner.profileIconId)"
-            class="size-14 rounded-2xl bg-zinc-800 ring-2 ring-amber-400/30"
+            class="size-14 rounded-2xl bg-zinc-800 ring-2 ring-amber-400/40 shadow-[0_8px_24px_-8px_rgb(245_158_11/0.5)]"
           />
           <span
-            class="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-zinc-900 px-1.5 text-[11px] text-zinc-300 tabular-nums"
+            class="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-amber-300/40 bg-linear-to-b from-zinc-800 to-zinc-950 px-1.5 text-[11px] font-semibold text-amber-200 tabular-nums"
           >
             {{ summoner.summonerLevel }}
           </span>
@@ -223,36 +234,72 @@ watch(
           </div>
         </div>
 
-        <div v-if="summary" class="ml-auto flex gap-6 pr-2">
+        <div v-if="summary" class="ml-auto flex items-center gap-6 pr-2">
           <div class="text-right">
             <div class="eyebrow">场次</div>
-            <div class="mt-0.5 text-lg font-semibold text-zinc-100 tabular-nums">
-              {{ summary.games }}
-              <span class="text-xs font-normal text-zinc-500">{{ summary.wins }} 胜</span>
-            </div>
-          </div>
-          <div class="text-right">
-            <div class="eyebrow">胜率</div>
-            <div
-              class="mt-0.5 text-lg font-semibold tabular-nums"
-              :class="summary.winRate >= 50 ? 'text-emerald-400' : 'text-red-400'"
-            >
-              {{ summary.winRate }}%
+            <div class="mt-0.5 text-lg font-semibold text-zinc-100">
+              <CountUp :value="summary.games" />
+              <span class="ml-1 text-xs font-normal text-zinc-500"><CountUp :value="summary.wins" /> 胜</span>
             </div>
           </div>
           <div class="text-right">
             <div class="eyebrow">KDA</div>
-            <div class="mt-0.5 text-lg font-semibold text-zinc-100 tabular-nums">{{ summary.kda }}</div>
+            <div class="mt-0.5 text-lg font-semibold text-zinc-100">
+              <CountUp v-if="summary.kda !== 'Perfect'" :value="Number(summary.kda)" :decimals="2" />
+              <span v-else class="text-amber-300">完美</span>
+            </div>
+          </div>
+          <!-- Win rate ring -->
+          <div class="relative size-16 shrink-0">
+            <svg viewBox="0 0 36 36" class="size-full -rotate-90">
+              <circle cx="18" cy="18" r="15.5" fill="none" stroke="rgb(255 255 255 / 0.07)" stroke-width="3" />
+              <circle
+                cx="18"
+                cy="18"
+                r="15.5"
+                fill="none"
+                stroke-width="3"
+                stroke-linecap="round"
+                pathLength="100"
+                stroke-dasharray="100"
+                :stroke-dashoffset="100 - summary.winRate"
+                class="transition-[stroke-dashoffset,stroke] duration-1000 ease-out-expo"
+                :class="summary.winRate >= 50 ? 'stroke-emerald-400' : 'stroke-red-400'"
+                :style="{ filter: `drop-shadow(0 0 4px ${summary.winRate >= 50 ? 'rgb(52 211 153 / 0.6)' : 'rgb(248 113 113 / 0.6)'})` }"
+              />
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center leading-none">
+              <span
+                class="text-sm font-semibold"
+                :class="summary.winRate >= 50 ? 'text-emerald-300' : 'text-red-300'"
+              >
+                <CountUp :value="summary.winRate" />%
+              </span>
+              <span class="mt-0.5 text-[9px] text-zinc-500">胜率</span>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <div v-if="summoner" class="segmented self-start">
-      <button class="segment px-4 py-1.5 text-sm" :class="view === 'games' && 'segment-active'" @click="view = 'games'">
+    <!-- Tabs with a pill that slides between them. -->
+    <div v-if="summoner" class="segmented relative self-start">
+      <span
+        class="pointer-events-none absolute inset-y-0.5 left-0.5 w-[calc(50%-3px)] rounded-md bg-linear-to-b from-amber-300/25 to-amber-500/10 shadow-[inset_0_1px_0_0_rgb(255_255_255/0.1),0_4px_14px_-6px_rgb(245_158_11/0.6)] ring-1 ring-amber-400/25 transition-transform duration-500 ease-spring ring-inset"
+        :style="{ transform: view === 'career' ? 'translateX(calc(100% + 2px))' : 'none' }"
+      />
+      <button
+        class="segment relative w-24 py-1.5 text-sm"
+        :class="view === 'games' && 'text-amber-100'"
+        @click="view = 'games'"
+      >
         对局记录
       </button>
-      <button class="segment px-4 py-1.5 text-sm" :class="view === 'career' && 'segment-active'" @click="view = 'career'">
+      <button
+        class="segment relative w-24 py-1.5 text-sm"
+        :class="view === 'career' && 'text-amber-100'"
+        @click="view = 'career'"
+      >
         生涯分析
       </button>
     </div>
@@ -291,7 +338,7 @@ watch(
         :key="game.gameId"
         :game="game"
         :puuid="summoner?.puuid ?? ''"
-        :style="{ transitionDelay: `${Math.min(i % PAGE_SIZE, 12) * 25}ms` }"
+        :style="{ transitionDelay: `${Math.min(i % PAGE_SIZE, 12) * 35}ms` }"
       />
     </TransitionGroup>
     <div v-if="loading && games.length === 0" class="flex flex-col gap-1.5">
