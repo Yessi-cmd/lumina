@@ -1,10 +1,11 @@
 import { defineStore } from "pinia";
 import { ref, shallowRef } from "vue";
-import { api, events, type PendingAccept, type Settings } from "../api";
+import { api, events, type PendingAccept, type Settings, type TiltWarning } from "../api";
 
 export const useSettingsStore = defineStore("settings", () => {
   const settings = shallowRef<Settings | null>(null);
   const pendingAccept = shallowRef<PendingAccept | null>(null);
+  const tilt = shallowRef<TiltWarning | null>(null);
   const saveError = ref<string | null>(null);
   let started = false;
 
@@ -16,9 +17,19 @@ export const useSettingsStore = defineStore("settings", () => {
       gotEvent = true;
       pendingAccept.value = p;
     });
-    const [loaded, pending] = await Promise.all([api.settings(), api.autoAcceptState()]);
+    let gotTilt = false;
+    await events.onTilt((w) => {
+      gotTilt = true;
+      tilt.value = w;
+    });
+    const [loaded, pending, warning] = await Promise.all([
+      api.settings(),
+      api.autoAcceptState(),
+      api.tiltState(),
+    ]);
     settings.value = loaded;
     if (!gotEvent) pendingAccept.value = pending;
+    if (!gotTilt) tilt.value = warning;
   }
 
   async function update(patch: Partial<Settings>) {
@@ -35,5 +46,10 @@ export const useSettingsStore = defineStore("settings", () => {
     api.cancelAutoAccept().catch((err) => console.warn("Failed to cancel auto accept", err));
   }
 
-  return { settings, pendingAccept, saveError, start, update, cancelAutoAccept };
+  function dismissTilt() {
+    tilt.value = null;
+    api.dismissTilt().catch((err) => console.warn("Failed to dismiss tilt warning", err));
+  }
+
+  return { settings, pendingAccept, tilt, saveError, start, update, cancelAutoAccept, dismissTilt };
 });

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import AppIcon, { type IconName } from "./components/common/AppIcon.vue";
 import AutoAcceptBanner from "./components/common/AutoAcceptBanner.vue";
 import UpdateBanner from "./components/common/UpdateBanner.vue";
+import TiltBanner from "./components/common/TiltBanner.vue";
 import TitleBar from "./components/common/TitleBar.vue";
 import TooltipLayer from "./components/common/TooltipLayer.vue";
 import { useAppStore } from "./stores/app";
@@ -185,6 +186,7 @@ onMounted(() => {
     <div class="flex min-w-0 flex-1 flex-col">
       <TitleBar :title="pageTitle" />
       <AutoAcceptBanner />
+      <TiltBanner />
       <UpdateBanner />
       <main class="min-w-0 flex-1 overflow-auto px-6 pt-2 pb-8">
         <RouterView v-slot="{ Component, route: current }">

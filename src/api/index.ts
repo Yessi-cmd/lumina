@@ -458,6 +458,26 @@ export interface Settings {
   matchupTier: string;
   /** Overlays beside the client during champ select. */
   champSelectOverlay: boolean;
+  /** Warn after this many ranked losses in a row; 0 is off. */
+  tiltStreak: number;
+  /** Honor a random teammate when the vote screen appears. */
+  autoHonor: boolean;
+  /** COOL / SHOTCALLER / HEART. */
+  honorCategory: string;
+  /** off / bark / serverchan. */
+  pushProvider: string;
+  /** Bark device key or self-hosted address, or the Server酱 SendKey. */
+  pushKey: string;
+  pushMatchFound: boolean;
+  pushChampSelect: boolean;
+  pushTilt: boolean;
+}
+
+/** A run of ranked losses worth a break. */
+export interface TiltWarning {
+  losses: number;
+  /** LP lost over the run, zero or negative. */
+  lp: number;
 }
 
 /** A teammate's most played champions in recent solo/duo games. */
@@ -593,6 +613,9 @@ export const api = {
     invoke<Career>("career", { puuid, queue, range }),
   /** Without `puuid`, the account seen last. */
   rankHistory: (puuid: string | null = null) => invoke<RankHistory | null>("rank_history", { puuid }),
+  tiltState: () => invoke<TiltWarning | null>("tilt_state"),
+  dismissTilt: () => invoke<void>("dismiss_tilt"),
+  pushTest: () => invoke<void>("push_test"),
   rankedChampions: (puuid: string) => invoke<RankedChampions>("ranked_champions", { puuid }),
   logDir: () => invoke<string>("log_dir"),
   openLogDir: () => invoke<void>("open_log_dir"),
@@ -618,6 +641,8 @@ export const events = {
   onGameflowPhase: (cb: (c: PhaseChange) => void): Promise<UnlistenFn> =>
     listen<PhaseChange>("lcu://gameflow-phase", (e) => cb(e.payload)),
   onRankUpdated: (cb: () => void): Promise<UnlistenFn> => listen("rank://updated", () => cb()),
+  onTilt: (cb: (w: TiltWarning | null) => void): Promise<UnlistenFn> =>
+    listen<TiltWarning | null>("tilt://warning", (e) => cb(e.payload)),
   onDraft: (cb: (d: Draft | null) => void): Promise<UnlistenFn> =>
     listen<Draft | null>("overlay://draft", (e) => cb(e.payload)),
   onUpdateProgress: (cb: (p: { downloaded: number; total: number }) => void): Promise<UnlistenFn> =>

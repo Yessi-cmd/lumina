@@ -400,6 +400,7 @@ async fn record(app: &AppHandle) -> Result<bool> {
         return Ok(false);
     }
     notify(app);
+    super::tilt::check(app, true);
     for point in fresh.iter().filter(|f| f.outcome.is_some()) {
         let game = latest_game(&state, &session, &summoner.puuid, point).await;
         if let Some(game) = game {

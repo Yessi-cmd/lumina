@@ -15,6 +15,12 @@ const DEFAULT_STATS_TIER: &str = "emerald_plus";
 /// Matchups are judged on high-rank games, where both sides play their champions well.
 pub const MATCHUP_TIERS: [&str; 3] = ["emerald_plus", "diamond_plus", "master_plus"];
 const DEFAULT_MATCHUP_TIER: &str = "diamond_plus";
+pub const MAX_TILT_STREAK: u32 = 10;
+/// Honor categories of the client: cool, shot caller, friendly.
+pub const HONOR_CATEGORIES: [&str; 3] = ["COOL", "SHOTCALLER", "HEART"];
+const DEFAULT_HONOR_CATEGORY: &str = "HEART";
+/// Phone push channels: Bark (iOS) and Server酱 (WeChat).
+pub const PUSH_PROVIDERS: [&str; 3] = ["off", "bark", "serverchan"];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -31,6 +37,19 @@ pub struct Settings {
     /// Overlays beside the client during champ select: teammates' champions and counters
     /// to the enemy picks.
     pub champ_select_overlay: bool,
+    /// Warn after this many ranked losses in a row; 0 turns it off.
+    pub tilt_streak: u32,
+    /// Honor a random teammate when the vote screen appears.
+    pub auto_honor: bool,
+    /// One of `HONOR_CATEGORIES`.
+    pub honor_category: String,
+    /// One of `PUSH_PROVIDERS`.
+    pub push_provider: String,
+    /// Bark device key (or self-hosted address) or Server酱 SendKey.
+    pub push_key: String,
+    pub push_match_found: bool,
+    pub push_champ_select: bool,
+    pub push_tilt: bool,
 }
 
 impl Default for Settings {
@@ -42,6 +61,14 @@ impl Default for Settings {
             stats_tier: DEFAULT_STATS_TIER.to_owned(),
             matchup_tier: DEFAULT_MATCHUP_TIER.to_owned(),
             champ_select_overlay: true,
+            tilt_streak: 3,
+            auto_honor: false,
+            honor_category: DEFAULT_HONOR_CATEGORY.to_owned(),
+            push_provider: "off".to_owned(),
+            push_key: String::new(),
+            push_match_found: true,
+            push_champ_select: true,
+            push_tilt: true,
         }
     }
 }
@@ -85,6 +112,14 @@ impl Settings {
         if !MATCHUP_TIERS.contains(&self.matchup_tier.as_str()) {
             self.matchup_tier = DEFAULT_MATCHUP_TIER.to_owned();
         }
+        self.tilt_streak = self.tilt_streak.min(MAX_TILT_STREAK);
+        if !HONOR_CATEGORIES.contains(&self.honor_category.as_str()) {
+            self.honor_category = DEFAULT_HONOR_CATEGORY.to_owned();
+        }
+        if !PUSH_PROVIDERS.contains(&self.push_provider.as_str()) {
+            self.push_provider = "off".to_owned();
+        }
+        self.push_key = self.push_key.trim().to_owned();
         self
     }
 }
@@ -107,5 +142,23 @@ mod tests {
         assert!(s.auto_show_panel);
         assert_eq!(s.stats_tier, DEFAULT_STATS_TIER);
         assert_eq!(s.auto_accept_delay_secs, MAX_ACCEPT_DELAY_SECS);
+        assert_eq!(s.tilt_streak, 3);
+        assert_eq!(s.push_provider, "off");
+    }
+
+    #[test]
+    fn rejects_unknown_choices_and_trims_the_push_key() {
+        let s = Settings {
+            tilt_streak: 99,
+            honor_category: "X".to_owned(),
+            push_provider: "sms".to_owned(),
+            push_key: "  abc \n".to_owned(),
+            ..Settings::default()
+        };
+        let s = s.normalized();
+        assert_eq!(s.tilt_streak, MAX_TILT_STREAK);
+        assert_eq!(s.honor_category, DEFAULT_HONOR_CATEGORY);
+        assert_eq!(s.push_provider, "off");
+        assert_eq!(s.push_key, "abc");
     }
 }

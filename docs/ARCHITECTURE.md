@@ -184,7 +184,20 @@ Lumina 把分析全部放到 Rust，并做了这些增强：
 - **前端**：`rank://updated` 事件触发刷新。走势图、今日 / 近 7 天 / 累计胜点、平均每胜每负、最长连胜连败、
   英雄加分 / 掉分榜都在前端由记录算出（`src/utils/rank.ts`）。
 
-### 3.3.8 悬停提示
+### 3.3.8 提醒与赛后（`services/tilt.rs`、`services/push.rs`、`services/honor.rs`）
+三个都由设置开关控制，设置项见 `config.rs`。
+- **连败止损**（`tilt_streak`，默认连败 3 把，0 关闭）：从段位记录里取最近连续的排位败局。
+  两局之间隔超过 3 小时、或最近一局离现在超过 3 小时，就不算连败。
+  新记录写入后检查一次（可推送到手机），开始排队（`Matchmaking`）时再检查一次（只在界面提醒）。
+  警告存在 `AppState.tilt`，变化时 emit `tilt://warning`，前端在顶部显示横幅，点「知道了」清除。
+- **手机推送**（`push_provider`：`off` / `bark` / `serverchan`）：找到对局（`ReadyCheck`）、进入选人（`ChampSelect`）、连败提醒三种消息，各有开关。
+  Bark 走 `GET /{key}/{标题}/{内容}`（密钥也可以是自建服务器的完整地址），Server酱走 `POST https://sctapi.ftqq.com/{SendKey}.send`。
+  消息直接从本机发往渠道，不经过其他服务器。设置页有「发送测试消息」。密钥明文存在 `settings.json`。
+- **自动荣誉点赞**（`auto_honor`，默认关）：进入 `PreEndOfGame` 后每 2 秒读一次 `/lol-honor-v2/v1/ballot`（最多 8 次），
+  有可点赞的队友就随机选一人，`POST /lol-honor-v2/v1/honor-player`，类型由 `honor_category` 决定。
+  点赞接口的字段没有在真实客户端上验证过，失败只写日志，不影响其他功能。
+
+### 3.3.9 悬停提示
 全局只有一个提示层（`TooltipLayer.vue`），元素上用 `v-tip`，同一时刻只显示一个，不会互相叠。
 - 装备、召唤师技能、符文的名称和说明来自 LCU 的 `items.json`、`summoner-spells.json`、`perks.json`。
   客户端的富文本标签在后端转成纯文本。

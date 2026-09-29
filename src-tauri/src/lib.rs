@@ -58,6 +58,9 @@ pub fn run() {
             commands::ranked_champions,
             commands::career,
             commands::rank_history,
+            commands::tilt_state,
+            commands::dismiss_tilt,
+            commands::push_test,
             commands::check_update,
             commands::open_release,
             commands::install_update

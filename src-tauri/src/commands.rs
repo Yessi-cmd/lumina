@@ -17,6 +17,7 @@ use crate::services::player_profile::{PlayerProfile, ProfileContext};
 use crate::services::rank_history::RankHistory;
 use crate::services::ranked_champions::RankedChampions;
 use crate::services::roster_insights::RosterInsights;
+use crate::services::tilt::TiltWarning;
 use crate::services::update_check::UpdateInfo;
 use crate::state::ongoing::Roster;
 use crate::state::{AppState, LcuSnapshot};
@@ -162,6 +163,25 @@ pub async fn career(
 #[tauri::command]
 pub fn rank_history(state: State<'_, AppState>, puuid: Option<String>) -> Option<RankHistory> {
     state.ranks.history(puuid.as_deref())
+}
+
+/// The ranked losing-streak warning shown now, if any; later changes arrive as
+/// `tilt://warning` events.
+#[tauri::command]
+pub fn tilt_state(state: State<'_, AppState>) -> Option<TiltWarning> {
+    state.tilt.current()
+}
+
+#[tauri::command]
+pub fn dismiss_tilt(app: AppHandle) {
+    services::tilt::dismiss(&app);
+}
+
+/// Sends one message through the saved push settings.
+#[tauri::command]
+pub async fn push_test(state: State<'_, AppState>) -> Result<()> {
+    let settings = state.settings();
+    services::push::test(&settings).await
 }
 
 /// A teammate's most played champions in recent solo/duo games.

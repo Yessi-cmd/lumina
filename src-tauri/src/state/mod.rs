@@ -18,6 +18,7 @@ use crate::services::champion_assist::ChampionAssist;
 use crate::services::game_detail::GameDetailService;
 use crate::services::match_history::MatchHistoryService;
 use crate::services::rank_history::RankTracker;
+use crate::services::tilt::Tilt;
 use crate::services::timeline::TimelineService;
 use ongoing::Roster;
 use session::LcuSession;
@@ -81,6 +82,7 @@ pub struct AppState {
     pub game_details: GameDetailService,
     pub champion_assist: ChampionAssist,
     pub ranks: RankTracker,
+    pub tilt: Tilt,
 }
 
 impl AppState {
@@ -99,6 +101,7 @@ impl AppState {
             game_details: GameDetailService::default(),
             champion_assist: ChampionAssist::default(),
             ranks,
+            tilt: Tilt::default(),
         }
     }
 

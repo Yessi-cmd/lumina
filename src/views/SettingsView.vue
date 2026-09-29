@@ -25,6 +25,27 @@ function openLogDir() {
   api.openLogDir().catch((err) => (logError.value = String(err)));
 }
 
+const pushTesting = ref(false);
+const pushResult = ref<{ ok: boolean; text: string } | null>(null);
+
+async function testPush() {
+  pushTesting.value = true;
+  pushResult.value = null;
+  try {
+    await api.pushTest();
+    pushResult.value = { ok: true, text: "已发送，看看手机有没有收到。" };
+  } catch (err) {
+    pushResult.value = { ok: false, text: String(err) };
+  } finally {
+    pushTesting.value = false;
+  }
+}
+
+const PUSH_HINTS: Record<string, string> = {
+  bark: "在 Bark App 首页复制设备 Key，也可以填自建服务器的完整地址（如 https://bark.example.com/密钥）。",
+  serverchan: "填 Server酱 Turbo 的 SendKey（sct.ftqq.com），消息会转发到微信。",
+};
+
 function onDelayInput(event: Event) {
   const value = Number((event.target as HTMLInputElement).value);
   store.update({ autoAcceptDelaySecs: value });
@@ -97,6 +118,126 @@ function onDelayInput(event: Event) {
               @update:model-value="store.update({ champSelectOverlay: $event })"
             />
           </div>
+        </div>
+      </div>
+
+      <div>
+        <h2 class="eyebrow mb-2 px-1">提醒与赛后</h2>
+        <div class="card divide-y divide-white/[0.05] overflow-hidden">
+          <div class="flex items-center justify-between gap-6 p-4 transition-colors duration-200 hover:bg-white/[0.02]">
+            <div>
+              <div class="font-medium text-zinc-100">连败止损提醒</div>
+              <div class="mt-0.5 text-sm text-zinc-400">
+                排位连败达到这个数、且最近一局在 3 小时内，就在顶部提醒一次；开始排队时若仍在连败中会再提醒。只统计 Lumina 记录到的排位对局。
+              </div>
+            </div>
+            <select
+              class="field w-36 shrink-0"
+              :value="s.tiltStreak"
+              @change="store.update({ tiltStreak: Number(($event.target as HTMLSelectElement).value) })"
+            >
+              <option :value="0">关闭</option>
+              <option :value="2">连败 2 把</option>
+              <option :value="3">连败 3 把</option>
+              <option :value="4">连败 4 把</option>
+              <option :value="5">连败 5 把</option>
+            </select>
+          </div>
+
+          <div class="flex items-center justify-between gap-6 p-4 transition-colors duration-200 hover:bg-white/[0.02]">
+            <div>
+              <div class="font-medium text-zinc-100">自动荣誉点赞</div>
+              <div class="mt-0.5 text-sm text-zinc-400">
+                对局结束出现点赞界面时，自动给一名随机队友点赞。想认真投票的话别开。
+              </div>
+            </div>
+            <ToggleSwitch :model-value="s.autoHonor" @update:model-value="store.update({ autoHonor: $event })" />
+          </div>
+
+          <div class="flex items-center justify-between gap-6 p-4" :class="!s.autoHonor && 'opacity-50'">
+            <span class="text-sm text-zinc-300">点赞类型</span>
+            <select
+              class="field w-36 shrink-0"
+              :disabled="!s.autoHonor"
+              :value="s.honorCategory"
+              @change="store.update({ honorCategory: ($event.target as HTMLSelectElement).value })"
+            >
+              <option value="HEART">友善</option>
+              <option value="SHOTCALLER">指挥</option>
+              <option value="COOL">酷</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h2 class="eyebrow mb-2 px-1">手机推送</h2>
+        <div class="card divide-y divide-white/[0.05] overflow-hidden">
+          <div class="flex items-center justify-between gap-6 p-4">
+            <div>
+              <div class="font-medium text-zinc-100">推送渠道</div>
+              <div class="mt-0.5 text-sm text-zinc-400">
+                排队后离开电脑时，找到对局、进入选人、连败提醒会发到手机。消息由这台电脑直接发给所选渠道。
+              </div>
+            </div>
+            <select
+              class="field w-36 shrink-0"
+              :value="s.pushProvider"
+              @change="store.update({ pushProvider: ($event.target as HTMLSelectElement).value })"
+            >
+              <option value="off">关闭</option>
+              <option value="bark">Bark（iOS）</option>
+              <option value="serverchan">Server酱（微信）</option>
+            </select>
+          </div>
+
+          <template v-if="s.pushProvider !== 'off'">
+            <div class="flex items-center gap-4 p-4">
+              <span class="w-20 shrink-0 text-sm text-zinc-300">密钥</span>
+              <input
+                type="password"
+                autocomplete="off"
+                spellcheck="false"
+                class="field min-w-0 flex-1"
+                placeholder="粘贴后按回车或点别处保存"
+                :value="s.pushKey"
+                @change="store.update({ pushKey: ($event.target as HTMLInputElement).value })"
+              />
+            </div>
+            <p class="px-4 py-3 text-xs text-zinc-500">{{ PUSH_HINTS[s.pushProvider] }}</p>
+
+            <div class="flex items-center justify-between gap-6 p-4">
+              <span class="text-sm text-zinc-300">找到对局时推送</span>
+              <ToggleSwitch
+                :model-value="s.pushMatchFound"
+                @update:model-value="store.update({ pushMatchFound: $event })"
+              />
+            </div>
+            <div class="flex items-center justify-between gap-6 p-4">
+              <span class="text-sm text-zinc-300">进入英雄选择时推送</span>
+              <ToggleSwitch
+                :model-value="s.pushChampSelect"
+                @update:model-value="store.update({ pushChampSelect: $event })"
+              />
+            </div>
+            <div class="flex items-center justify-between gap-6 p-4">
+              <span class="text-sm text-zinc-300">连败提醒时推送</span>
+              <ToggleSwitch :model-value="s.pushTilt" @update:model-value="store.update({ pushTilt: $event })" />
+            </div>
+
+            <div class="flex items-center gap-4 p-4">
+              <button class="btn btn-secondary" :disabled="pushTesting || !s.pushKey" @click="testPush">
+                {{ pushTesting ? "发送中…" : "发送测试消息" }}
+              </button>
+              <span
+                v-if="pushResult"
+                class="min-w-0 text-sm break-all"
+                :class="pushResult.ok ? 'text-emerald-400' : 'text-red-400'"
+              >
+                {{ pushResult.text }}
+              </span>
+            </div>
+          </template>
         </div>
       </div>
 
