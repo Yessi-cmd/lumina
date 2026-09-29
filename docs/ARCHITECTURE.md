@@ -55,7 +55,9 @@
 - token：战绩接口用 LCU `/entitlements/v1/token` 的 accessToken（每次请求前现取）；
   `summoner-ledge` 等接口需要 `/lol-league-session/v1/league-session-token`，用到时再接入。
 - 接口：M2 只用 `match-history-query` 的 SUMMARY（按 puuid 分页）。
-  `gsm` 在国服选人阶段返回 403/404（见 Akari 日志），不用于 BP；加载阶段敌方名单直接取 LCU `/lol-gameflow/v1/session`。
+  `gsm` 在国服选人阶段可能返回 403/404（见 Akari 日志），不用于 BP；加载阶段优先取 LCU `/lol-gameflow/v1/session`。
+  排位名单不足 5v5 时，使用 league-session token 查询 SGP `gsm/v1/ledge/region/{platform}/puuid/{puuid}`，
+  仅合并同一局缺失的成员并短时重试。
 - 降级：SGP 失败时回退到 LCU `/lol-match-history/v1/products/lol/{puuid}/matches`，
   结果带 `source` 与 `sgpError` 标注。
 - 注意：客户端开加速器时，Lumina 直连 SGP 不一定走加速，失败会自动回退 LCU。
@@ -76,7 +78,8 @@
   的固定 16 字节 XOR 掩码解析 `obfuscatedPuuid`，恢复的 PUUID 进入正常名单及战绩预取流程。
   可见玩家直接使用原始 `puuid`；匿名标识缺失、格式错误或为空 UUID 时保留匿名队友占位或敌方隐藏计数，
   后续客户端提供有效身份时自动更新。
-- 加载阶段：`/lol-gameflow/v1/session` 的 `gameData.teamOne/teamTwo` 出现双方 puuid，按自己所在队伍分我方/敌方。
+- 加载阶段：`/lol-gameflow/v1/session` 的 `gameData.teamOne/teamTwo` 提供双方 puuid，按自己所在队伍分我方/敌方。
+  有时会直接少一条玩家记录；排位时显示缺失人数，并从 GSM 当前对局名单补齐，以便预取该玩家战绩。
 - 名单变化时 emit `ongoing://roster`，并对新出现的 puuid 预取第一页战绩（20 场）进缓存；
   前端卡片请求同一页，基本直接命中缓存。进入 `None/Lobby/Matchmaking/ReadyCheck` 时清空名单。
 

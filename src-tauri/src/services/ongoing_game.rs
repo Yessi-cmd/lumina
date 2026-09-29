@@ -2,6 +2,8 @@
 //! are resolved when the client supplies a usable obfuscated PUUID; otherwise they
 //! remain placeholders until the client exposes their identity.
 
+use std::time::Duration;
+
 use tauri::{AppHandle, Manager};
 
 use crate::clients::lcu::models::{
@@ -9,6 +11,7 @@ use crate::clients::lcu::models::{
     LobbySession,
 };
 use crate::clients::lcu::puuid::decrypt_puuid;
+use crate::clients::sgp::models::SgpGsmGame;
 use crate::state::ongoing::{AnonymousPlayer, Roster, RosterPlayer, RosterStage};
 use crate::state::AppState;
 
@@ -152,8 +155,130 @@ fn apply_gameflow(app: &AppHandle, session: GameflowSession) {
     }
     let snapshot = app.state::<AppState>().lcu_snapshot();
     let self_puuid = snapshot.summoner.map(|s| s.puuid).unwrap_or_default();
-    if let Some(roster) = from_gameflow(session, &self_puuid) {
+    if let Some(mut roster) = from_gameflow(session, &self_puuid) {
+        if roster_needs_recovery(&roster) {
+            if let Some(previous) = app.state::<AppState>().roster() {
+                if previous.stage == RosterStage::InGame && previous.game_id == roster.game_id {
+                    merge_known_players(&mut roster, &previous);
+                }
+            }
+        }
+        let incomplete = roster_needs_recovery(&roster);
+        let game_id = roster.game_id;
         apply(app, Some(roster));
+        if incomplete {
+            tauri::async_runtime::spawn(recover_roster(app.clone(), game_id, self_puuid));
+        }
+    }
+}
+
+fn roster_needs_recovery(roster: &Roster) -> bool {
+    matches!(roster.queue_id, 420 | 440)
+        && (roster.allies.len() < 5 || roster.enemies.len() < 5)
+}
+
+/// A gameflow session can omit an entire player rather than include an empty PUUID.
+/// Akari uses GSM's current-game roster for this case. Only fill gaps from the same game.
+async fn recover_roster(app: AppHandle, game_id: i64, self_puuid: String) {
+    let Ok(session) = app.state::<AppState>().session() else {
+        return;
+    };
+    let Some(sgp) = &session.sgp else {
+        return;
+    };
+    for delay in [0, 2, 5, 10] {
+        if delay > 0 {
+            tokio::time::sleep(Duration::from_secs(delay)).await;
+        }
+        let Some(current) = app.state::<AppState>().roster() else {
+            return;
+        };
+        if current.stage != RosterStage::InGame || current.game_id != game_id {
+            return;
+        }
+        if !roster_needs_recovery(&current) {
+            return;
+        }
+        let token: String = match session
+            .http
+            .get("/lol-league-session/v1/league-session-token")
+            .await
+        {
+            Ok(token) => token,
+            Err(err) => {
+                log::debug!("GSM roster token unavailable: {err}");
+                continue;
+            }
+        };
+        match sgp.current_game(&token, &self_puuid).await {
+            Ok(Some(response)) if response.game.id == game_id => {
+                let Some(mut current) = app.state::<AppState>().roster() else {
+                    return;
+                };
+                if current.stage != RosterStage::InGame || current.game_id != game_id {
+                    return;
+                }
+                let before = (current.allies.len(), current.enemies.len());
+                merge_gsm_roster(&mut current, response.game, &self_puuid);
+                if (current.allies.len(), current.enemies.len()) != before {
+                    log::info!(
+                        "GSM roster recovered game {game_id}: {} allies, {} enemies",
+                        current.allies.len(),
+                        current.enemies.len()
+                    );
+                }
+                apply(&app, Some(current));
+            }
+            Ok(Some(_)) => log::debug!("GSM roster belongs to another game"),
+            Ok(None) => return,
+            Err(err) => log::debug!("GSM roster recovery failed: {err}"),
+        }
+    }
+}
+
+fn merge_gsm_roster(roster: &mut Roster, game: SgpGsmGame, self_puuid: &str) {
+    let in_one = game.team_one.iter().any(|p| p.puuid == self_puuid);
+    let in_two = game.team_two.iter().any(|p| p.puuid == self_puuid);
+    let (mine, theirs) = match (in_one, in_two) {
+        (true, false) => (game.team_one, game.team_two),
+        (false, true) => (game.team_two, game.team_one),
+        _ => return,
+    };
+    for (members, target) in [(mine, &mut roster.allies), (theirs, &mut roster.enemies)] {
+        for member in members {
+            if !is_known(&member.puuid) || target.iter().any(|p| p.puuid == member.puuid) {
+                continue;
+            }
+            target.push(RosterPlayer {
+                is_self: member.puuid == self_puuid,
+                puuid: member.puuid,
+                champion_id: member.champion_id,
+                position: member.selected_position.to_uppercase(),
+            });
+        }
+    }
+    roster.hidden_enemies = gameflow_missing_enemies(roster);
+}
+
+fn merge_known_players(roster: &mut Roster, previous: &Roster) {
+    for (target, known) in [
+        (&mut roster.allies, &previous.allies),
+        (&mut roster.enemies, &previous.enemies),
+    ] {
+        for player in known {
+            if !target.iter().any(|p| p.puuid == player.puuid) {
+                target.push(player.clone());
+            }
+        }
+    }
+    roster.hidden_enemies = gameflow_missing_enemies(roster);
+}
+
+fn gameflow_missing_enemies(roster: &Roster) -> usize {
+    if matches!(roster.queue_id, 420 | 440) {
+        5usize.saturating_sub(roster.enemies.len())
+    } else {
+        roster.hidden_enemies
     }
 }
 
@@ -327,7 +452,7 @@ fn from_gameflow(session: GameflowSession, self_puuid: &str) -> Option<Roster> {
             None => hidden_enemies += 1,
         }
     }
-    Some(Roster {
+    let mut roster = Roster {
         stage: RosterStage::InGame,
         game_id: data.game_id,
         queue_id: data.queue.id,
@@ -336,7 +461,9 @@ fn from_gameflow(session: GameflowSession, self_puuid: &str) -> Option<Roster> {
         enemies,
         hidden_enemies,
         enemy_champions,
-    })
+    };
+    roster.hidden_enemies = gameflow_missing_enemies(&roster);
+    Some(roster)
 }
 
 fn gameflow_player(player: GameflowPlayer, self_puuid: &str) -> Option<RosterPlayer> {
@@ -443,5 +570,43 @@ mod tests {
         let json = r#"{"phase":"InProgress","gameData":{"teamOne":[{"puuid":"x"}]}}"#;
         let session: GameflowSession = serde_json::from_str(json).unwrap();
         assert!(from_gameflow(session, "me").is_none());
+    }
+
+    #[test]
+    fn incomplete_gameflow_roster_is_marked_and_recovered_from_gsm() {
+        let session: GameflowSession = serde_json::from_str(
+            r#"{"phase":"GameStart","gameData":{"gameId":9,"queue":{"id":440},
+            "teamOne":[{"puuid":"me"},{"puuid":"a"},{"puuid":"b"},{"puuid":"c"},{"puuid":"d"}],
+            "teamTwo":[{"puuid":"e"},{"puuid":"f"},{"puuid":"g"},{"puuid":"h"}]}}"#,
+        )
+        .unwrap();
+        let mut roster = from_gameflow(session, "me").unwrap();
+        assert_eq!(roster.hidden_enemies, 1);
+        assert!(roster_needs_recovery(&roster));
+        let gsm: SgpGsmGame = serde_json::from_str(
+            r#"{"id":9,
+            "teamOne":[{"puuid":"me"},{"puuid":"a"},{"puuid":"b"},{"puuid":"c"},{"puuid":"d"}],
+            "teamTwo":[{"puuid":"e"},{"puuid":"f"},{"puuid":"g"},{"puuid":"h"},
+            {"puuid":"i","championId":103,"selectedPosition":"middle"}]}"#,
+        )
+        .unwrap();
+        merge_gsm_roster(&mut roster, gsm, "me");
+        assert_eq!(roster.enemies.len(), 5);
+        assert_eq!(roster.enemies[4].puuid, "i");
+        assert_eq!(roster.enemies[4].champion_id, 103);
+        assert_eq!(roster.enemies[4].position, "MIDDLE");
+        assert_eq!(roster.hidden_enemies, 0);
+        assert!(!roster_needs_recovery(&roster));
+
+        let session: GameflowSession = serde_json::from_str(
+            r#"{"phase":"InProgress","gameData":{"gameId":9,"queue":{"id":440},
+            "teamOne":[{"puuid":"me"}],
+            "teamTwo":[{"puuid":"e"},{"puuid":"f"},{"puuid":"g"},{"puuid":"h"}]}}"#,
+        )
+        .unwrap();
+        let mut partial_again = from_gameflow(session, "me").unwrap();
+        merge_known_players(&mut partial_again, &roster);
+        assert_eq!(partial_again.enemies.len(), 5);
+        assert_eq!(partial_again.hidden_enemies, 0);
     }
 }

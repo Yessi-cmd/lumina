@@ -3,7 +3,7 @@ use std::time::Duration;
 use reqwest::RequestBuilder;
 use serde::de::DeserializeOwned;
 
-use super::models::{SgpGame, SgpGameDetails, SgpMatchHistory};
+use super::models::{SgpGame, SgpGameDetails, SgpGsmCurrentGame, SgpMatchHistory};
 use super::servers::ResolvedServer;
 use crate::error::{AppError, Result};
 
@@ -26,6 +26,23 @@ impl SgpClient {
 
     pub fn server(&self) -> &ResolvedServer {
         &self.server
+    }
+
+    /// Current game roster; GSM uses the league-session token, not entitlements.
+    pub async fn current_game(
+        &self,
+        league_session_token: &str,
+        puuid: &str,
+    ) -> Result<Option<SgpGsmCurrentGame>> {
+        let Some(base) = &self.server.server.common else {
+            return Ok(None);
+        };
+        let url = format!(
+            "{base}/gsm/v1/ledge/region/{}/puuid/{puuid}",
+            self.server.path_region
+        );
+        let request = self.client.get(url).bearer_auth(league_session_token);
+        Self::send(request).await.map(Some)
     }
 
     /// Newest first, optionally only one queue. Authenticated with the LCU entitlements

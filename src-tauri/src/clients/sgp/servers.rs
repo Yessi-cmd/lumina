@@ -9,6 +9,7 @@ const SERVERS_JSON: &str = include_str!("../../../resources/servers.json");
 #[serde(rename_all = "camelCase")]
 pub struct SgpServer {
     pub match_history: String,
+    pub common: Option<String>,
     pub name: String,
     pub region_path_param: Option<String>,
 }

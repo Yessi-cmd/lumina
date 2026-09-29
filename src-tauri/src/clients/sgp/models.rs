@@ -5,6 +5,28 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct SgpGsmCurrentGame {
+    pub game: SgpGsmGame,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SgpGsmGame {
+    pub id: i64,
+    pub team_one: Vec<SgpGsmPlayer>,
+    pub team_two: Vec<SgpGsmPlayer>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SgpGsmPlayer {
+    pub puuid: String,
+    pub champion_id: i64,
+    pub selected_position: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct SgpMatchHistory {
     #[serde(default)]
