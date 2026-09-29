@@ -32,6 +32,7 @@ native-tls = "0.2"
 reqwest = { version = "0.12", default-features = false, features = ["json", "native-tls"] }
 tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
 sysinfo = { version = "0.37", default-features = false, features = ["system"] }
+sha2 = "0.10"
 
 # Window placement of the League client, for the champ-select overlays.
 [target.'cfg(windows)'.dependencies]

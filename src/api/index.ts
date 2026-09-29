@@ -521,6 +521,8 @@ export interface UpdateInfo {
   /** Without the leading `v`. */
   latest: string;
   available: boolean;
+  /** Installed copy with an installer in the release: one-click update works. */
+  installable: boolean;
   url: string;
   /** Release notes, Markdown. */
   notes: string;
@@ -564,6 +566,7 @@ export const api = {
   openLogDir: () => invoke<void>("open_log_dir"),
   checkUpdate: () => invoke<UpdateInfo>("check_update"),
   openRelease: (url: string) => invoke<void>("open_release", { url }),
+  installUpdate: () => invoke<void>("install_update"),
   logFrontend: (level: "info" | "warn" | "error", message: string) =>
     invoke<void>("log_frontend", { level, message }),
 };
@@ -584,4 +587,6 @@ export const events = {
     listen<PhaseChange>("lcu://gameflow-phase", (e) => cb(e.payload)),
   onDraft: (cb: (d: Draft | null) => void): Promise<UnlistenFn> =>
     listen<Draft | null>("overlay://draft", (e) => cb(e.payload)),
+  onUpdateProgress: (cb: (p: { downloaded: number; total: number }) => void): Promise<UnlistenFn> =>
+    listen<{ downloaded: number; total: number }>("update://progress", (e) => cb(e.payload)),
 };

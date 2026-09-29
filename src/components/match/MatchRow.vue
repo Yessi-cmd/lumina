@@ -102,8 +102,9 @@ function share(value: number | undefined): string {
   return value === undefined ? "" : `占 ${Math.round(value * 100)}%`;
 }
 
-/** Both teams' champions, the player's own team first. */
+/** Both teams' champions, the player's own team first. Arena's many duos do not fit. */
 const lineup = computed(() => {
+  if (props.game.participants.length > 10) return [];
   const mine = props.game.participants.filter((p) => p.teamId === props.game.teamId);
   const theirs = props.game.participants.filter((p) => p.teamId !== props.game.teamId);
   return [mine, theirs].filter((team) => team.length > 0);
@@ -112,7 +113,7 @@ const lineup = computed(() => {
 
 <template>
   <div
-    class="overflow-hidden rounded-xl border bg-zinc-900/70 backdrop-blur-sm transition-[border-color,box-shadow,transform] duration-300 ease-out-expo"
+    class="@container overflow-hidden rounded-xl border bg-zinc-900/70 backdrop-blur-sm transition-[border-color,box-shadow,transform] duration-300 ease-out-expo"
     :class="[
       result.bg,
       expanded
@@ -120,32 +121,41 @@ const lineup = computed(() => {
         : ['border-white/[0.05] hover:-translate-y-0.5 hover:border-white/[0.12]', result.glow],
     ]"
   >
+    <!-- Every block has a fixed width and never shrinks; only the stats absorb spare
+         room. Narrow windows drop whole blocks (container queries) instead of
+         squeezing icons. -->
     <div
-      class="group/row grid cursor-pointer grid-cols-[4px_6.5rem_auto_9rem_minmax(11rem,1fr)_auto_auto_1rem] items-center gap-x-4 py-2 pr-3 transition-colors hover:bg-white/[0.025]"
+      class="group/row flex cursor-pointer items-center gap-2.5 py-2 pr-3 transition-colors hover:bg-white/[0.025]"
       @click="expanded = !expanded"
     >
-      <div class="my-1 w-[3px] self-stretch rounded-r-full" :class="result.bar" />
+      <div class="my-1 w-[3px] shrink-0 self-stretch rounded-r-full" :class="result.bar" />
 
-      <!-- Result, queue, time -->
-      <div class="min-w-0 text-xs leading-5">
-        <div class="font-semibold" :class="result.text">
-          {{ result.label }}
-          <span v-if="POSITIONS[game.position]" class="ml-1 font-normal text-zinc-500">
-            {{ POSITIONS[game.position] }}
+      <!-- Result, badge, queue, time -->
+      <div class="w-[6.75rem] shrink-0 text-xs leading-5">
+        <div class="flex items-center gap-1 whitespace-nowrap">
+          <span class="font-semibold" :class="result.text">{{ result.label }}</span>
+          <span v-if="POSITIONS[game.position]" class="text-zinc-500">{{ POSITIONS[game.position] }}</span>
+          <span
+            v-if="game.badge"
+            v-tip="BADGE[game.badge].tip"
+            class="rounded px-1 text-[10px] leading-4 font-bold tracking-wide ring-1 ring-inset"
+            :class="BADGE[game.badge].class"
+          >
+            {{ BADGE[game.badge].label }}
           </span>
         </div>
         <div class="truncate text-zinc-300" v-tip="gd.queueName(game.queueId, game.gameMode)">
           {{ gd.queueName(game.queueId, game.gameMode) }}
         </div>
-        <div class="text-zinc-500">{{ timeAgo(game.createdAt) }} · {{ formatDuration(game.duration) }}</div>
+        <div class="truncate text-zinc-500">{{ timeAgo(game.createdAt) }} · {{ formatDuration(game.duration) }}</div>
       </div>
 
       <!-- Champion, spells, runes -->
-      <div class="flex items-center gap-1.5">
-        <div class="relative" v-tip="gd.championName(game.championId)">
+      <div class="flex shrink-0 items-center gap-1.5">
+        <div class="relative shrink-0" v-tip="gd.championName(game.championId)">
           <img
             :src="gd.championIcon(game.championId)"
-            class="size-12 rounded-xl bg-zinc-800 ring-1 ring-white/10 transition-transform duration-500 ease-spring group-hover/row:scale-110 group-hover/row:-rotate-3"
+            class="size-12 max-w-none rounded-xl bg-zinc-800 object-cover ring-1 ring-white/10 transition-transform duration-500 ease-spring group-hover/row:scale-110 group-hover/row:-rotate-3"
           />
           <span
             class="absolute -right-1 -bottom-1 rounded-md border border-white/10 bg-zinc-950 px-1 text-[10px] text-zinc-300 tabular-nums"
@@ -153,13 +163,13 @@ const lineup = computed(() => {
             {{ game.champLevel }}
           </span>
         </div>
-        <div class="grid grid-cols-2 gap-0.5">
+        <div class="grid shrink-0 grid-cols-[repeat(2,22px)] gap-0.5">
           <template v-for="(spell, i) in game.spells" :key="i">
             <img
               v-if="gd.spellIcon(spell)"
               v-tip="gd.spellTip(spell)"
               :src="gd.spellIcon(spell)"
-              class="icon-hover size-[22px] rounded-md bg-zinc-800"
+              class="icon-hover size-[22px] max-w-none rounded-md bg-zinc-800"
             />
             <div v-else class="size-[22px] rounded-md bg-zinc-800" />
           </template>
@@ -167,36 +177,28 @@ const lineup = computed(() => {
             v-if="gd.perkIcon(game.keystone)"
             v-tip="gd.perkTip(game.keystone)"
             :src="gd.perkIcon(game.keystone)"
-            class="icon-hover size-[22px] rounded-full bg-zinc-800"
+            class="icon-hover size-[22px] max-w-none rounded-full bg-zinc-800"
           />
-          <div v-else class="size-[22px] rounded-full bg-zinc-800" />
+          <div v-else class="size-[22px] rounded-full bg-zinc-800/60" />
           <img
             v-if="gd.perkIcon(game.subStyle)"
             v-tip="gd.perkTip(game.subStyle)"
             :src="gd.perkIcon(game.subStyle)"
-            class="icon-hover size-[22px] p-0.5"
+            class="icon-hover size-[22px] max-w-none p-0.5"
           />
           <div v-else class="size-[22px]" />
         </div>
       </div>
 
       <!-- KDA -->
-      <div class="text-center">
-        <div class="text-[15px] font-semibold tracking-tight tabular-nums">
+      <div class="w-[6.75rem] shrink-0 text-center">
+        <div class="text-[15px] font-semibold tracking-tight whitespace-nowrap tabular-nums">
           {{ game.kills }}<span class="text-zinc-600"> / </span><span class="text-red-400">{{ game.deaths }}</span
           ><span class="text-zinc-600"> / </span>{{ game.assists }}
         </div>
-        <div class="mt-1 flex flex-wrap items-center justify-center gap-1">
+        <div class="mt-1 flex items-center justify-center gap-1 whitespace-nowrap">
           <span class="rounded-md px-1.5 py-px text-[11px] font-medium ring-1 ring-inset tabular-nums" :class="kdaClass">
             {{ kda === "Perfect" ? "完美" : `${kda} KDA` }}
-          </span>
-          <span
-            v-if="game.badge"
-            v-tip="BADGE[game.badge].tip"
-            class="rounded-md px-1.5 py-px text-[11px] font-bold tracking-wide ring-1 ring-inset"
-            :class="BADGE[game.badge].class"
-          >
-            {{ BADGE[game.badge].label }}
           </span>
           <span
             v-if="multiKill"
@@ -207,66 +209,24 @@ const lineup = computed(() => {
         </div>
       </div>
 
-      <!-- Labelled stats -->
-      <div class="grid grid-cols-4 gap-2">
+      <!-- Labelled stats: the only flexible block -->
+      <div class="grid min-w-[9rem] flex-1 grid-cols-4 gap-2">
         <div v-for="s in stats" :key="s.label" class="min-w-0">
           <div class="text-[10px] text-zinc-500">{{ s.label }}</div>
-          <div class="text-sm font-medium text-zinc-100 tabular-nums">{{ s.value }}</div>
+          <div class="truncate text-sm font-medium text-zinc-100 tabular-nums">{{ s.value }}</div>
           <div class="h-4 truncate text-[10px] text-zinc-500 tabular-nums">{{ s.hint }}</div>
         </div>
       </div>
 
-      <!-- Damage against the lane opponent -->
-      <div
-        v-if="versus"
-        v-tip="{
-          title: `每分钟伤害比${versus.against}${versus.diff >= 0 ? '高' : '低'} ${Math.abs(versus.diff)}%`,
-          body: versus.against === '对位' ? '和本局同位置的对手比。' : '本局没有位置信息，和其他 9 人的平均比。',
-        }"
-        class="w-14 rounded-lg py-1 text-center ring-1 ring-inset"
-        :class="
-          versus.diff >= 0 ? 'bg-emerald-400/10 ring-emerald-400/20' : 'bg-red-400/10 ring-red-400/20'
-        "
-      >
-        <div class="text-[10px] text-zinc-500">{{ versus.against }}</div>
-        <div
-          class="text-xs font-semibold tabular-nums"
-          :class="versus.diff >= 0 ? 'text-emerald-300' : 'text-red-300'"
-        >
-          {{ versus.diff >= 0 ? "+" : "" }}{{ versus.diff }}%
-        </div>
-      </div>
-      <div v-else class="w-14" />
-
-      <!-- Items, augments and lineup. Fixed tracks: fractional ones squeeze the icons. -->
-      <div class="flex shrink-0 items-center gap-3">
-        <div class="flex items-center gap-1">
-          <div class="grid grid-cols-[repeat(3,1.625rem)] gap-0.5">
-            <template v-for="(item, i) in game.items.slice(0, 6)" :key="i">
-              <img
-                v-if="gd.itemIcon(item)"
-                v-tip="gd.itemTip(item)"
-                :src="gd.itemIcon(item)"
-                class="icon-hover size-[1.625rem] rounded-md bg-zinc-800 object-cover"
-              />
-              <div v-else class="size-[1.625rem] rounded-md bg-zinc-800/60" />
-            </template>
-          </div>
-          <img
-            v-if="gd.itemIcon(game.items[6])"
-            v-tip="gd.itemTip(game.items[6])"
-            :src="gd.itemIcon(game.items[6])"
-            class="icon-hover size-[1.625rem] shrink-0 rounded-full bg-zinc-800 object-cover"
-          />
-          <div v-else class="size-[1.625rem] shrink-0 rounded-full bg-zinc-800/60" />
-        </div>
+      <!-- One slot: augments in Arena / ARAM: Mayhem, otherwise the lane comparison -->
+      <div class="flex w-[5.25rem] shrink-0 justify-center @max-[46rem]:hidden">
         <div v-if="game.augments.length" class="grid grid-flow-col grid-rows-2 gap-0.5">
           <template v-for="a in game.augments" :key="a">
             <img
               v-if="gd.augmentIcon(a)"
               v-tip="gd.augmentTip(a)"
               :src="gd.augmentIcon(a)"
-              class="icon-hover size-[1.625rem] rounded-md bg-zinc-950 object-cover ring-1 ring-inset"
+              class="icon-hover size-[1.625rem] max-w-none rounded-md bg-zinc-950 object-cover ring-1 ring-inset"
               :class="AUGMENT_RING[gd.data?.augments?.[a]?.rarity ?? ''] ?? 'ring-white/10'"
             />
             <div
@@ -276,23 +236,66 @@ const lineup = computed(() => {
             />
           </template>
         </div>
-        <div class="flex shrink-0 flex-col gap-0.5">
-          <div v-for="(team, t) in lineup" :key="t" class="flex gap-0.5">
-            <img
-              v-for="p in team"
-              :key="p.puuid"
-              v-tip="gd.championName(p.championId)"
-              :src="gd.championIcon(p.championId)"
-              class="icon-hover size-5 shrink-0 rounded bg-zinc-800"
-              :class="p.puuid === puuid && 'ring-1 ring-amber-400'"
-            />
+        <div
+          v-else-if="versus"
+          v-tip="{
+            title: `每分钟伤害比${versus.against}${versus.diff >= 0 ? '高' : '低'} ${Math.abs(versus.diff)}%`,
+            body: versus.against === '对位' ? '和本局同位置的对手比。' : '本局没有位置信息，和其他玩家的平均比。',
+          }"
+          class="w-16 rounded-lg py-1 text-center ring-1 ring-inset"
+          :class="
+            versus.diff >= 0 ? 'bg-emerald-400/10 ring-emerald-400/20' : 'bg-red-400/10 ring-red-400/20'
+          "
+        >
+          <div class="text-[10px] whitespace-nowrap text-zinc-500">{{ versus.against }}</div>
+          <div
+            class="text-xs font-semibold tabular-nums"
+            :class="versus.diff >= 0 ? 'text-emerald-300' : 'text-red-300'"
+          >
+            {{ versus.diff >= 0 ? "+" : "" }}{{ versus.diff }}%
           </div>
+        </div>
+      </div>
+
+      <!-- Items: six in a 3×2 grid, trinket beside them -->
+      <div class="flex shrink-0 items-center gap-1">
+        <div class="grid grid-cols-[repeat(3,1.625rem)] gap-0.5">
+          <template v-for="(item, i) in game.items.slice(0, 6)" :key="i">
+            <img
+              v-if="gd.itemIcon(item)"
+              v-tip="gd.itemTip(item)"
+              :src="gd.itemIcon(item)"
+              class="icon-hover size-[1.625rem] max-w-none rounded-md bg-zinc-800 object-cover"
+            />
+            <div v-else class="size-[1.625rem] rounded-md bg-zinc-800/60" />
+          </template>
+        </div>
+        <img
+          v-if="gd.itemIcon(game.items[6])"
+          v-tip="gd.itemTip(game.items[6])"
+          :src="gd.itemIcon(game.items[6])"
+          class="icon-hover size-[1.625rem] max-w-none rounded-full bg-zinc-800 object-cover"
+        />
+        <div v-else class="size-[1.625rem] rounded-full bg-zinc-800/60" />
+      </div>
+
+      <!-- Both teams -->
+      <div class="flex w-[6.75rem] shrink-0 flex-col gap-0.5 @max-[54rem]:hidden">
+        <div v-for="(team, t) in lineup" :key="t" class="flex gap-0.5">
+          <img
+            v-for="p in team"
+            :key="p.puuid"
+            v-tip="gd.championName(p.championId)"
+            :src="gd.championIcon(p.championId)"
+            class="icon-hover size-5 max-w-none rounded bg-zinc-800 object-cover"
+            :class="p.puuid === puuid && 'ring-1 ring-amber-400'"
+          />
         </div>
       </div>
 
       <svg
         viewBox="0 0 24 24"
-        class="size-4 text-zinc-500 transition-transform duration-300 ease-out-expo group-hover/row:text-zinc-300"
+        class="size-4 shrink-0 text-zinc-500 transition-transform duration-300 ease-out-expo group-hover/row:text-zinc-300"
         :class="expanded && 'rotate-180'"
         fill="none"
         stroke="currentColor"

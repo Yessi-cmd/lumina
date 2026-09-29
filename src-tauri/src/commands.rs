@@ -269,3 +269,10 @@ pub async fn check_update() -> Result<UpdateInfo> {
 pub fn open_release(url: String) -> Result<()> {
     services::update_check::open_release(&url)
 }
+
+/// Downloads and runs the newest installer, then quits; progress arrives as
+/// `update://progress` events.
+#[tauri::command]
+pub async fn install_update(app: AppHandle) -> Result<()> {
+    services::update_check::install(&app).await
+}

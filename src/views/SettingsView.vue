@@ -172,6 +172,7 @@ function onDelayInput(event: Event) {
             <div class="font-medium text-zinc-100">Lumina v{{ app.info?.version ?? "…" }}</div>
             <div class="mt-0.5 text-sm text-zinc-400">
               <template v-if="app.checking">正在检查更新…</template>
+              <template v-else-if="app.installError">更新失败：{{ app.installError }}</template>
               <template v-else-if="app.updateError">检查更新失败：{{ app.updateError }}</template>
               <template v-else-if="app.update?.available">
                 GitHub 上有新版本 v{{ app.update.latest }}。
@@ -181,7 +182,17 @@ function onDelayInput(event: Event) {
             </div>
           </div>
           <div class="flex shrink-0 gap-2">
-            <button v-if="app.update?.available" class="btn btn-primary" @click="app.openRelease()">
+            <button
+              v-if="app.update?.installable"
+              class="btn btn-primary"
+              :disabled="app.installProgress !== null"
+              @click="app.installUpdate()"
+            >
+              {{
+                app.installProgress === null ? "立即更新" : `下载中 ${Math.round(app.installProgress * 100)}%`
+              }}
+            </button>
+            <button v-else-if="app.update?.available" class="btn btn-primary" @click="app.openRelease()">
               前往下载
             </button>
             <button class="btn btn-secondary" :disabled="app.checking" @click="app.checkUpdate()">

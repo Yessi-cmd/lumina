@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { api, type AppInfo, type UpdateInfo } from "../api";
+import { api, events, type AppInfo, type UpdateInfo } from "../api";
 
 /** Re-check while the app stays open. */
 const UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -49,6 +49,28 @@ export const useAppStore = defineStore("app", () => {
     }
   }
 
+  /** Download progress 0–1 while installing; null otherwise. */
+  const installProgress = ref<number | null>(null);
+  const installError = ref<string | null>(null);
+
+  /** Downloads and starts the installer; the app quits once it runs. */
+  async function installUpdate() {
+    if (installProgress.value !== null) return;
+    installProgress.value = 0;
+    installError.value = null;
+    const unlisten = await events.onUpdateProgress((p) => {
+      installProgress.value = p.total > 0 ? p.downloaded / p.total : 0;
+    });
+    try {
+      await api.installUpdate();
+    } catch (err) {
+      installError.value = String(err);
+      installProgress.value = null;
+    } finally {
+      unlisten();
+    }
+  }
+
   function openRelease() {
     const url = update.value?.url;
     if (url) api.openRelease(url).catch((err) => console.error("Failed to open release", err));
@@ -65,6 +87,9 @@ export const useAppStore = defineStore("app", () => {
     watchUpdates,
     dismissUpdate,
     openRelease,
+    installProgress,
+    installError,
+    installUpdate,
   };
 });
 

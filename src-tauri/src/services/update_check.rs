@@ -1,16 +1,28 @@
-//! Tells the user when GitHub has a newer release. Only checks and links to the
-//! release page: installing stays manual, which also suits the portable build.
+//! Tells the user when GitHub has a newer release and, for installed copies, updates
+//! in one click: download the NSIS installer, check it, run it passively and quit.
+//! Portable copies only get the link to the release page.
 
+use std::fmt::Write;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use tauri::{AppHandle, Emitter};
+use tokio::io::AsyncWriteExt;
 
 use crate::error::{AppError, Result};
 
 const LATEST_RELEASE: &str = "https://api.github.com/repos/Yessi-cmd/lumina/releases/latest";
 /// Only pages under this prefix may be opened from the frontend.
 const RELEASES_PAGE: &str = "https://github.com/Yessi-cmd/lumina/releases";
+/// Installers are only downloaded from this repository's release assets.
+const DOWNLOADS: &str = "https://github.com/Yessi-cmd/lumina/releases/download/";
+const INSTALLER_SUFFIX: &str = "-setup.exe";
+pub const PROGRESS_EVENT: &str = "update://progress";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+/// Downloads have no overall limit, only a stall limit.
+const READ_TIMEOUT: Duration = Duration::from_secs(30);
 const USER_AGENT: &str = concat!("Lumina/", env!("CARGO_PKG_VERSION"));
 
 #[derive(Debug, Clone, Serialize)]
@@ -20,9 +32,18 @@ pub struct UpdateInfo {
     /// Newest published release, without the leading `v`.
     pub latest: String,
     pub available: bool,
+    /// This copy was installed and the release has an installer, so one-click works.
+    pub installable: bool,
     pub url: String,
     /// Release notes as written on GitHub (Markdown).
     pub notes: String,
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Progress {
+    pub downloaded: u64,
+    pub total: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -31,30 +52,76 @@ struct GithubRelease {
     html_url: String,
     #[serde(default)]
     body: String,
+    #[serde(default)]
+    assets: Vec<GithubAsset>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GithubAsset {
+    name: String,
+    browser_download_url: String,
+    size: u64,
+    /// `sha256:<hex>`; older releases may lack it.
+    #[serde(default)]
+    digest: Option<String>,
+}
+
+impl GithubRelease {
+    fn version(&self) -> &str {
+        self.tag_name.trim_start_matches('v')
+    }
+
+    fn installer(&self) -> Option<&GithubAsset> {
+        self.assets
+            .iter()
+            .find(|a| a.name.ends_with(INSTALLER_SUFFIX))
+    }
 }
 
 pub async fn check() -> Result<UpdateInfo> {
-    let client = reqwest::Client::builder()
-        .timeout(REQUEST_TIMEOUT)
-        .user_agent(USER_AGENT)
-        .build()?;
-    let response = client
-        .get(LATEST_RELEASE)
-        .header("Accept", "application/vnd.github+json")
-        .send()
-        .await?
-        .error_for_status()?;
-    let release: GithubRelease = response.json().await?;
-
+    let release = latest_release().await?;
     let current = env!("CARGO_PKG_VERSION");
-    let latest = release.tag_name.trim_start_matches('v').to_owned();
+    let available = newer(release.version(), current);
     Ok(UpdateInfo {
         current: current.to_owned(),
-        available: newer(&latest, current),
-        latest,
+        latest: release.version().to_owned(),
+        available,
+        installable: available && installed() && release.installer().is_some(),
         url: release.html_url,
         notes: release.body,
     })
+}
+
+/// Downloads the newest installer, starts it and quits so it can replace the files.
+/// The installer restarts Lumina when it is done.
+pub async fn install(app: &AppHandle) -> Result<()> {
+    if !installed() {
+        return Err(AppError::Message("免安装版请到发布页下载新版本".to_owned()));
+    }
+    let release = latest_release().await?;
+    if !newer(release.version(), env!("CARGO_PKG_VERSION")) {
+        return Err(AppError::Message("已是最新版本".to_owned()));
+    }
+    let asset = release
+        .installer()
+        .ok_or_else(|| AppError::Message("这个版本没有安装包".to_owned()))?;
+    if !asset.browser_download_url.starts_with(DOWNLOADS) {
+        let url = &asset.browser_download_url;
+        return Err(AppError::Message(format!("不允许的下载地址: {url}")));
+    }
+
+    let dir = std::env::temp_dir().join("lumina-update");
+    tokio::fs::create_dir_all(&dir).await?;
+    let path = dir.join(&asset.name);
+    download(app, asset, &path).await?;
+
+    log::info!("starting installer {}", path.display());
+    // Passive: progress only, no questions; /R starts Lumina again afterwards.
+    std::process::Command::new(&path)
+        .args(["/P", "/R"])
+        .spawn()?;
+    app.exit(0);
+    Ok(())
 }
 
 /// Opens a Lumina release page in the default browser.
@@ -65,6 +132,74 @@ pub fn open_release(url: &str) -> Result<()> {
     // Explorer hands the URL to the browser and exits at once, so its status is moot.
     std::process::Command::new("explorer").arg(url).status()?;
     Ok(())
+}
+
+async fn latest_release() -> Result<GithubRelease> {
+    let client = reqwest::Client::builder()
+        .timeout(REQUEST_TIMEOUT)
+        .user_agent(USER_AGENT)
+        .build()?;
+    let response = client
+        .get(LATEST_RELEASE)
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await?
+        .error_for_status()?;
+    Ok(response.json().await?)
+}
+
+async fn download(app: &AppHandle, asset: &GithubAsset, path: &Path) -> Result<()> {
+    let client = reqwest::Client::builder()
+        .connect_timeout(REQUEST_TIMEOUT)
+        .read_timeout(READ_TIMEOUT)
+        .user_agent(USER_AGENT)
+        .build()?;
+    let mut response = client
+        .get(&asset.browser_download_url)
+        .send()
+        .await?
+        .error_for_status()?;
+
+    let total = asset.size;
+    let mut file = tokio::fs::File::create(path).await?;
+    let mut hasher = Sha256::new();
+    let mut downloaded = 0u64;
+    while let Some(chunk) = response.chunk().await? {
+        file.write_all(&chunk).await?;
+        hasher.update(&chunk);
+        downloaded += chunk.len() as u64;
+        let _ = app.emit(PROGRESS_EVENT, Progress { downloaded, total });
+    }
+    file.flush().await?;
+    drop(file);
+
+    if downloaded != total {
+        let message = format!("安装包不完整（{downloaded}/{total} 字节）");
+        return Err(AppError::Message(message));
+    }
+    if let Some(expected) = asset.digest.as_deref().and_then(|d| d.strip_prefix("sha256:")) {
+        let actual = hex(&hasher.finalize());
+        if !actual.eq_ignore_ascii_case(expected) {
+            let _ = tokio::fs::remove_file(path).await;
+            return Err(AppError::Message("安装包校验失败，请重试".to_owned()));
+        }
+    }
+    Ok(())
+}
+
+/// The NSIS installer puts `uninstall.exe` beside the app; a portable copy has none.
+fn installed() -> bool {
+    let exe = std::env::current_exe().ok();
+    let dir: Option<PathBuf> = exe.and_then(|e| e.parent().map(Path::to_path_buf));
+    dir.is_some_and(|d| d.join("uninstall.exe").is_file())
+}
+
+fn hex(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        let _ = write!(out, "{b:02x}");
+    }
+    out
 }
 
 /// Numeric `major.minor.patch` comparison; anything unparsable is never newer.
@@ -97,5 +232,17 @@ mod tests {
         assert!(!newer("0.2.2", "0.2.2"));
         assert!(!newer("0.2.1", "0.2.2"));
         assert!(!newer("latest", "0.2.2"));
+    }
+
+    #[test]
+    fn finds_the_installer_asset() {
+        let json = r#"{"tag_name":"v0.4.0","html_url":"u","assets":[
+            {"name":"Lumina_0.4.0_x64_portable.zip","browser_download_url":"a","size":1},
+            {"name":"Lumina_0.4.0_x64-setup.exe","browser_download_url":"b","size":2,
+             "digest":"sha256:ab"}]}"#;
+        let release: GithubRelease = serde_json::from_str(json).unwrap();
+        assert_eq!(release.version(), "0.4.0");
+        assert_eq!(release.installer().unwrap().browser_download_url, "b");
+        assert_eq!(hex(&[0x0a, 0xff]), "0aff");
     }
 }

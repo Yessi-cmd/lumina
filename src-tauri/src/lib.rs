@@ -16,6 +16,13 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(logging::plugin())
         .register_asynchronous_uri_scheme_protocol(asset_proxy::SCHEME, asset_proxy::handle)
+        // The champ-select overlays live on hidden, so closing the main window alone
+        // would leave the process running in the background.
+        .on_window_event(|window, event| {
+            if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
+                window.app_handle().exit(0);
+            }
+        })
         .setup(|app| {
             let version = env!("CARGO_PKG_VERSION");
             log::info!("Lumina {version} starting on {}", std::env::consts::OS);
@@ -51,7 +58,8 @@ pub fn run() {
             commands::ranked_champions,
             commands::career,
             commands::check_update,
-            commands::open_release
+            commands::open_release,
+            commands::install_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
