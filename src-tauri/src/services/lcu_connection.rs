@@ -15,7 +15,9 @@ use crate::clients::lcu::ws::LcuSocket;
 use crate::clients::sgp::http::SgpClient;
 use crate::clients::sgp::servers;
 use crate::error::Result;
-use crate::services::{auto_accept, draft, ongoing_game, overlay_window, panel_window, rank_history};
+use crate::services::{
+    auto_accept, draft, ongoing_game, overlay_window, panel_window, rank_history,
+};
 use crate::state::gameflow::PHASE_NONE;
 use crate::state::session::LcuSession;
 use crate::state::{AppState, ClientInfo, ConnectionStatus};
