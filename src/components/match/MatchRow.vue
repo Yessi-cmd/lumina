@@ -125,13 +125,13 @@ const lineup = computed(() => {
          room. Narrow windows drop whole blocks (container queries) instead of
          squeezing icons. -->
     <div
-      class="group/row flex cursor-pointer items-center gap-2.5 py-2 pr-3 transition-colors hover:bg-white/[0.025]"
+      class="group/row flex cursor-pointer items-center gap-2 py-2 pr-3 transition-colors hover:bg-white/[0.025]"
       @click="expanded = !expanded"
     >
       <div class="my-1 w-[3px] shrink-0 self-stretch rounded-r-full" :class="result.bar" />
 
       <!-- Result, badge, queue, time -->
-      <div class="w-[6.75rem] shrink-0 text-xs leading-5">
+      <div class="w-[6.25rem] shrink-0 text-xs leading-5">
         <div class="flex items-center gap-1 whitespace-nowrap">
           <span class="font-semibold" :class="result.text">{{ result.label }}</span>
           <span v-if="POSITIONS[game.position]" class="text-zinc-500">{{ POSITIONS[game.position] }}</span>
@@ -191,7 +191,7 @@ const lineup = computed(() => {
       </div>
 
       <!-- KDA -->
-      <div class="w-[6.75rem] shrink-0 text-center">
+      <div class="w-[6.25rem] shrink-0 text-center">
         <div class="text-[15px] font-semibold tracking-tight whitespace-nowrap tabular-nums">
           {{ game.kills }}<span class="text-zinc-600"> / </span><span class="text-red-400">{{ game.deaths }}</span
           ><span class="text-zinc-600"> / </span>{{ game.assists }}
@@ -210,7 +210,7 @@ const lineup = computed(() => {
       </div>
 
       <!-- Labelled stats: the only flexible block -->
-      <div class="grid min-w-[9rem] flex-1 grid-cols-4 gap-2">
+      <div class="grid max-w-[19rem] min-w-[10rem] flex-1 grid-cols-4 gap-1.5">
         <div v-for="s in stats" :key="s.label" class="min-w-0">
           <div class="text-[10px] text-zinc-500">{{ s.label }}</div>
           <div class="truncate text-sm font-medium text-zinc-100 tabular-nums">{{ s.value }}</div>
@@ -219,20 +219,29 @@ const lineup = computed(() => {
       </div>
 
       <!-- One slot: augments in Arena / ARAM: Mayhem, otherwise the lane comparison -->
-      <div class="flex w-[5.25rem] shrink-0 justify-center @max-[46rem]:hidden">
-        <div v-if="game.augments.length" class="grid grid-flow-col grid-rows-2 gap-0.5">
+      <div class="ml-auto flex w-16 shrink-0 justify-center @max-[46rem]:hidden">
+        <!-- Usually four (2×2); up to six drop to smaller icons so the slot keeps its width -->
+        <div
+          v-if="game.augments.length"
+          class="grid gap-0.5"
+          :class="game.augments.length > 4 ? 'grid-cols-[repeat(3,1.25rem)]' : 'grid-cols-[repeat(2,1.625rem)]'"
+        >
           <template v-for="a in game.augments" :key="a">
             <img
               v-if="gd.augmentIcon(a)"
               v-tip="gd.augmentTip(a)"
               :src="gd.augmentIcon(a)"
-              class="icon-hover size-[1.625rem] max-w-none rounded-md bg-zinc-950 object-cover ring-1 ring-inset"
-              :class="AUGMENT_RING[gd.data?.augments?.[a]?.rarity ?? ''] ?? 'ring-white/10'"
+              class="icon-hover max-w-none rounded-md bg-zinc-950 object-cover ring-1 ring-inset"
+              :class="[
+                game.augments.length > 4 ? 'size-5' : 'size-[1.625rem]',
+                AUGMENT_RING[gd.data?.augments?.[a]?.rarity ?? ''] ?? 'ring-white/10',
+              ]"
             />
             <div
               v-else
               v-tip="gd.augmentTip(a)"
-              class="size-[1.625rem] rounded-md bg-zinc-800 ring-1 ring-white/10 ring-inset"
+              class="rounded-md bg-zinc-800 ring-1 ring-white/10 ring-inset"
+              :class="game.augments.length > 4 ? 'size-5' : 'size-[1.625rem]'"
             />
           </template>
         </div>
@@ -242,7 +251,7 @@ const lineup = computed(() => {
             title: `每分钟伤害比${versus.against}${versus.diff >= 0 ? '高' : '低'} ${Math.abs(versus.diff)}%`,
             body: versus.against === '对位' ? '和本局同位置的对手比。' : '本局没有位置信息，和其他玩家的平均比。',
           }"
-          class="w-16 rounded-lg py-1 text-center ring-1 ring-inset"
+          class="w-full rounded-lg py-1 text-center ring-1 ring-inset"
           :class="
             versus.diff >= 0 ? 'bg-emerald-400/10 ring-emerald-400/20' : 'bg-red-400/10 ring-red-400/20'
           "
