@@ -200,7 +200,10 @@ async fn select(app: &AppHandle, turn: &Turn, config: &AutoSelect) -> Result<()>
     let available: Vec<i64> = session.http.get(list).await?;
     let wanted = candidates(config, &turn.position, turn.kind);
     let Some(champion) = choose(&wanted, &available, &turn.avoid) else {
-        log::info!("auto {:?}: no champion of the preset is available", turn.kind);
+        log::info!(
+            "auto {:?}: no champion of the preset is available",
+            turn.kind
+        );
         return Ok(());
     };
 

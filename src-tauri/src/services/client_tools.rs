@@ -40,7 +40,9 @@ pub async fn set_availability(session: &LcuSession, availability: &str) -> Resul
 
 pub async fn set_status_message(session: &LcuSession, message: &str) -> Result<()> {
     if message.chars().count() > MAX_STATUS_CHARS {
-        return Err(AppError::Message(format!("签名最多 {MAX_STATUS_CHARS} 个字")));
+        return Err(AppError::Message(format!(
+            "签名最多 {MAX_STATUS_CHARS} 个字"
+        )));
     }
     let body = json!({ "statusMessage": message });
     let http = &session.http;
