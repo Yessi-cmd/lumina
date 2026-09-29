@@ -173,8 +173,7 @@ fn apply_gameflow(app: &AppHandle, session: GameflowSession) {
 }
 
 fn roster_needs_recovery(roster: &Roster) -> bool {
-    matches!(roster.queue_id, 420 | 440)
-        && (roster.allies.len() < 5 || roster.enemies.len() < 5)
+    matches!(roster.queue_id, 420 | 440) && (roster.allies.len() < 5 || roster.enemies.len() < 5)
 }
 
 /// A gameflow session can omit an entire player rather than include an empty PUUID.
