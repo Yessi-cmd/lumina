@@ -2,6 +2,7 @@
 import { computed, ref, shallowRef, watch } from "vue";
 import { api, type Career, type CareerRange, type Rates } from "../../api";
 import { useGameDataStore } from "../../stores/gameData";
+import { TIERS, tierText } from "../../utils/rank";
 import RadarChart from "./RadarChart.vue";
 import TrendChart from "./TrendChart.vue";
 
@@ -21,18 +22,6 @@ const MODES: { id: number | null; label: string }[] = [
   { id: 430, label: "匹配（自选）" },
   { id: 450, label: "极地大乱斗" },
 ];
-const TIERS: Record<string, { name: string; color: string }> = {
-  IRON: { name: "黑铁", color: "text-zinc-400" },
-  BRONZE: { name: "青铜", color: "text-orange-300" },
-  SILVER: { name: "白银", color: "text-slate-300" },
-  GOLD: { name: "黄金", color: "text-amber-300" },
-  PLATINUM: { name: "铂金", color: "text-teal-300" },
-  EMERALD: { name: "翡翠", color: "text-emerald-300" },
-  DIAMOND: { name: "钻石", color: "text-sky-300" },
-  MASTER: { name: "大师", color: "text-fuchsia-300" },
-  GRANDMASTER: { name: "宗师", color: "text-red-300" },
-  CHALLENGER: { name: "王者", color: "text-yellow-200" },
-};
 const POSITIONS: Record<string, string> = {
   TOP: "上单",
   JUNGLE: "打野",
@@ -75,13 +64,6 @@ function pct(v: number): string {
 
 function kdaText(k: number, d: number, a: number): string {
   return ((k + a) / Math.max(1, d)).toFixed(2);
-}
-
-function tierText(tier: string, division: string): string {
-  if (!tier) return "未定级";
-  const name = TIERS[tier]?.name ?? tier;
-  const apex = ["MASTER", "GRANDMASTER", "CHALLENGER"].includes(tier);
-  return apex || !division || division === "NA" ? name : `${name} ${division}`;
 }
 
 function points(p: number): string {

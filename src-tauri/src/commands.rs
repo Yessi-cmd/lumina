@@ -14,6 +14,7 @@ use crate::services::game_data::GameData;
 use crate::services::game_detail::{GameDetail, PlayerBuild};
 use crate::services::match_history::MatchHistoryPage;
 use crate::services::player_profile::{PlayerProfile, ProfileContext};
+use crate::services::rank_history::RankHistory;
 use crate::services::ranked_champions::RankedChampions;
 use crate::services::roster_insights::RosterInsights;
 use crate::services::update_check::UpdateInfo;
@@ -154,6 +155,13 @@ pub async fn career(
     let session = state.session()?;
     let history = &state.match_history;
     services::career::load(history, &session, &puuid, queue, range).await
+}
+
+/// Recorded rank changes of `puuid` (default: the account seen last); later changes
+/// arrive as `rank://updated` events.
+#[tauri::command]
+pub fn rank_history(state: State<'_, AppState>, puuid: Option<String>) -> Option<RankHistory> {
+    state.ranks.history(puuid.as_deref())
 }
 
 /// A teammate's most played champions in recent solo/duo games.

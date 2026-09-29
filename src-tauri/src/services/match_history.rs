@@ -240,6 +240,29 @@ impl MatchHistoryService {
         Ok(page)
     }
 
+    /// Like `get_queue`, but never answers from the cache: for a game that just ended,
+    /// which a page fetched a minute ago does not list yet.
+    pub async fn get_fresh(
+        &self,
+        session: &LcuSession,
+        puuid: &str,
+        start: u32,
+        count: u32,
+        queue: Option<i64>,
+    ) -> Result<MatchHistoryPage> {
+        let req = PageRequest {
+            puuid: puuid.to_owned(),
+            start,
+            count: count.clamp(1, MAX_PAGE_SIZE),
+            queue,
+        };
+        let permit = self.limiter.acquire().await;
+        let _permit = permit.expect("semaphore is never closed");
+        let page = fetch(session, &req).await?;
+        self.store(req, page.clone());
+        Ok(page)
+    }
+
     fn cached(&self, req: &PageRequest) -> Option<MatchHistoryPage> {
         let cache = self.cache.lock().unwrap_or_else(PoisonError::into_inner);
         let (at, page) = cache.get(req)?;

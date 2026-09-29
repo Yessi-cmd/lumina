@@ -34,6 +34,7 @@ watch(
 const navItems: { to: string; label: string; icon: IconName }[] = [
   { to: "/", label: "概览", icon: "dashboard" },
   { to: "/match-history", label: "战绩", icon: "history" },
+  { to: "/rank", label: "段位", icon: "trending" },
   { to: "/ongoing-game", label: "对局", icon: "swords" },
   { to: "/settings", label: "设置", icon: "settings" },
 ];

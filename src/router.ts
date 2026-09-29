@@ -9,6 +9,7 @@ export const router = createRouter({
       name: "match-history",
       component: () => import("./views/MatchHistoryView.vue"),
     },
+    { path: "/rank", name: "rank", component: () => import("./views/RankView.vue") },
     {
       path: "/ongoing-game",
       name: "ongoing-game",

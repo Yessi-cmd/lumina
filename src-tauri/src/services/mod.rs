@@ -14,6 +14,7 @@ pub mod ongoing_game;
 pub mod overlay_window;
 pub mod panel_window;
 pub mod player_profile;
+pub mod rank_history;
 pub mod ranked_champions;
 pub mod roster_insights;
 pub mod roster_relations;

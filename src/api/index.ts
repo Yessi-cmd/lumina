@@ -528,6 +528,36 @@ export interface UpdateInfo {
   notes: string;
 }
 
+export type RankQueue = "solo" | "flex";
+
+/** One recorded change of a ranked queue; see `services/rank_history.rs`. */
+export interface RankPoint {
+  /** Unix milliseconds at which the change was noticed. */
+  at: number;
+  queue: RankQueue;
+  tier: string;
+  /** Empty for Master and above. */
+  division: string;
+  lp: number;
+  wins: number;
+  losses: number;
+  /** LP gained or lost since the previous point of the queue; null for the first one. */
+  delta: number | null;
+  /** Known when exactly one game was played since the previous point. */
+  outcome: "win" | "loss" | null;
+  gameId: number | null;
+  championId: number | null;
+  /** Kills, deaths, assists. */
+  kda: [number, number, number] | null;
+}
+
+export interface RankHistory {
+  puuid: string;
+  name: string;
+  /** Oldest first, both queues. */
+  points: RankPoint[];
+}
+
 /** Page size the backend prefetches for every player in the current game. */
 export const PANEL_HISTORY_COUNT = 20;
 
@@ -561,6 +591,8 @@ export const api = {
   draftState: () => invoke<Draft | null>("draft_state"),
   career: (puuid: string, queue: number | null, range: CareerRange) =>
     invoke<Career>("career", { puuid, queue, range }),
+  /** Without `puuid`, the account seen last. */
+  rankHistory: (puuid: string | null = null) => invoke<RankHistory | null>("rank_history", { puuid }),
   rankedChampions: (puuid: string) => invoke<RankedChampions>("ranked_champions", { puuid }),
   logDir: () => invoke<string>("log_dir"),
   openLogDir: () => invoke<void>("open_log_dir"),
@@ -585,6 +617,7 @@ export const events = {
     listen<PendingAccept | null>("auto-accept://state", (e) => cb(e.payload)),
   onGameflowPhase: (cb: (c: PhaseChange) => void): Promise<UnlistenFn> =>
     listen<PhaseChange>("lcu://gameflow-phase", (e) => cb(e.payload)),
+  onRankUpdated: (cb: () => void): Promise<UnlistenFn> => listen("rank://updated", () => cb()),
   onDraft: (cb: (d: Draft | null) => void): Promise<UnlistenFn> =>
     listen<Draft | null>("overlay://draft", (e) => cb(e.payload)),
   onUpdateProgress: (cb: (p: { downloaded: number; total: number }) => void): Promise<UnlistenFn> =>

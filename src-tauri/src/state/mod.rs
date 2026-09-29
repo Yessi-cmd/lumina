@@ -17,6 +17,7 @@ use crate::services::auto_accept::AutoAccept;
 use crate::services::champion_assist::ChampionAssist;
 use crate::services::game_detail::GameDetailService;
 use crate::services::match_history::MatchHistoryService;
+use crate::services::rank_history::RankTracker;
 use crate::services::timeline::TimelineService;
 use ongoing::Roster;
 use session::LcuSession;
@@ -79,11 +80,13 @@ pub struct AppState {
     pub auto_accept: AutoAccept,
     pub game_details: GameDetailService,
     pub champion_assist: ChampionAssist,
+    pub ranks: RankTracker,
 }
 
 impl AppState {
     pub fn new(app: AppHandle) -> Self {
         let settings = Settings::load(&app);
+        let ranks = RankTracker::load(&app);
         Self {
             app,
             lcu: Mutex::default(),
@@ -95,6 +98,7 @@ impl AppState {
             auto_accept: AutoAccept::default(),
             game_details: GameDetailService::default(),
             champion_assist: ChampionAssist::default(),
+            ranks,
         }
     }
 
