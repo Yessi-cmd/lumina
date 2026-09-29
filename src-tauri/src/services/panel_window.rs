@@ -14,7 +14,9 @@ use crate::clients::live::LiveClient;
 use crate::state::AppState;
 
 const MAIN_WINDOW: &str = "main";
-const POLL_INTERVAL: Duration = Duration::from_secs(2);
+/// Also how often the pin is renewed: the game window appears after GameStart and may
+/// go fullscreen above every topmost window that existed before it.
+const POLL_INTERVAL: Duration = Duration::from_secs(1);
 const MAX_PIN: Duration = Duration::from_secs(5 * 60);
 /// Set while a loading-screen pin is active, so a second GameStart does not stack another.
 static PINNED: AtomicBool = AtomicBool::new(false);
@@ -60,6 +62,7 @@ async fn unpin_when_loaded(app: AppHandle, window: WebviewWindow) {
     let live = LiveClient::new().ok();
     let reason = loop {
         tokio::time::sleep(POLL_INTERVAL).await;
+        lift_above_topmost(&window);
         let phase = app.state::<AppState>().lcu_snapshot().gameflow_phase;
         if !matches!(phase.as_str(), "GameStart" | "InProgress") {
             break "left the game";
@@ -89,4 +92,26 @@ fn set_topmost(window: &WebviewWindow, topmost: bool) {
     if let Err(err) = window.set_always_on_top(topmost) {
         log::warn!("failed to set always-on-top to {topmost}: {err}");
     }
+}
+
+/// Moves the window to the top of the topmost band again, without taking focus.
+#[cfg(windows)]
+fn lift_above_topmost(window: &WebviewWindow) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
+    };
+
+    let Ok(handle) = window.hwnd() else {
+        return;
+    };
+    let flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW;
+    // SAFETY: repositions our own top-level window; no pointers are passed.
+    unsafe {
+        SetWindowPos(handle.0.cast(), HWND_TOPMOST, 0, 0, 0, 0, flags);
+    }
+}
+
+#[cfg(not(windows))]
+fn lift_above_topmost(window: &WebviewWindow) {
+    set_topmost(window, true);
 }
