@@ -9,6 +9,7 @@ use crate::services;
 use crate::services::auto_accept::Pending;
 use crate::services::career::{Career, Range};
 use crate::services::champion_assist::{BuildVariant, ChampionBuild, MatchupReport, TierEntry};
+use crate::services::client_tools::{ChatStatus, Skin};
 use crate::services::draft::Draft;
 use crate::services::game_data::GameData;
 use crate::services::game_detail::{GameDetail, PlayerBuild};
@@ -170,6 +171,54 @@ pub async fn teammates(
     let session = state.session()?;
     let history = &state.match_history;
     services::teammates::load(history, &session, &puuid, queue, range).await
+}
+
+/// Online, away or invisible, and the status message.
+#[tauri::command]
+pub async fn chat_status(state: State<'_, AppState>) -> Result<ChatStatus> {
+    let session = state.session()?;
+    services::client_tools::chat_status(&session).await
+}
+
+/// `chat` (online), `away` or `offline` (invisible).
+#[tauri::command]
+pub async fn set_chat_availability(state: State<'_, AppState>, status: String) -> Result<()> {
+    let session = state.session()?;
+    services::client_tools::set_availability(&session, &status).await
+}
+
+#[tauri::command]
+pub async fn set_chat_status_message(state: State<'_, AppState>, message: String) -> Result<()> {
+    let session = state.session()?;
+    services::client_tools::set_status_message(&session, &message).await
+}
+
+/// The skins of a champion, with which ones the player owns.
+#[tauri::command]
+pub async fn champion_skins(state: State<'_, AppState>, champion_id: i64) -> Result<Vec<Skin>> {
+    let session = state.session()?;
+    let summoner_id = services::client_tools::own_summoner_id(&state)?;
+    services::client_tools::champion_skins(&session, summoner_id, champion_id).await
+}
+
+/// Skin id of the current career background; 0 when there is none.
+#[tauri::command]
+pub async fn profile_background(state: State<'_, AppState>) -> Result<i64> {
+    let session = state.session()?;
+    services::client_tools::profile_background(&session).await
+}
+
+#[tauri::command]
+pub async fn set_profile_background(state: State<'_, AppState>, skin_id: i64) -> Result<()> {
+    let session = state.session()?;
+    services::client_tools::set_profile_background(&session, skin_id).await
+}
+
+/// Restarts the client window; the game keeps running.
+#[tauri::command]
+pub async fn restart_client(state: State<'_, AppState>) -> Result<()> {
+    let session = state.session()?;
+    services::client_tools::restart_client(&session).await
 }
 
 /// Recorded rank changes of `puuid` (default: the account seen last); later changes

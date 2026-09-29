@@ -14,6 +14,7 @@ use crate::clients::lcu::models::Summoner;
 use crate::config::Settings;
 use crate::error::{AppError, Result};
 use crate::services::auto_accept::AutoAccept;
+use crate::services::auto_select::AutoSelectState;
 use crate::services::champion_assist::ChampionAssist;
 use crate::services::game_detail::GameDetailService;
 use crate::services::match_history::MatchHistoryService;
@@ -83,6 +84,7 @@ pub struct AppState {
     pub champion_assist: ChampionAssist,
     pub ranks: RankTracker,
     pub tilt: Tilt,
+    pub auto_select: AutoSelectState,
 }
 
 impl AppState {
@@ -102,6 +104,7 @@ impl AppState {
             champion_assist: ChampionAssist::default(),
             ranks,
             tilt: Tilt::default(),
+            auto_select: AutoSelectState::default(),
         }
     }
 

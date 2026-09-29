@@ -18,7 +18,7 @@ use crate::error::Result;
 use crate::services::{
     auto_accept, draft, ongoing_game, overlay_window, panel_window, rank_history,
 };
-use crate::services::{honor, push, tilt};
+use crate::services::{auto_select, honor, push, tilt};
 use crate::state::gameflow::PHASE_NONE;
 use crate::state::session::LcuSession;
 use crate::state::{AppState, ClientInfo, ConnectionStatus};
@@ -193,10 +193,12 @@ fn event_router(app: AppHandle) -> UriRouter {
             tilt::on_phase(&phase_app, &phase);
             push::on_phase(&phase_app, &phase);
             honor::on_phase(&phase_app, &phase);
+            auto_select::on_phase(&phase_app, &phase);
         })
         .on(ongoing_game::CHAMP_SELECT_SESSION, move |event| {
             ongoing_game::on_champ_select(&champ_select_app, event);
             draft::on_champ_select(&champ_select_app, event);
+            auto_select::on_champ_select(&champ_select_app, event);
         })
         .on(ongoing_game::GAMEFLOW_SESSION, move |event| {
             ongoing_game::on_gameflow_session(&gameflow_app, event);

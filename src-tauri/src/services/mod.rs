@@ -1,7 +1,9 @@
 pub mod auto_accept;
+pub mod auto_select;
 pub mod career;
 pub mod champion_assist;
 pub mod champion_mastery;
+pub mod client_tools;
 pub mod client_window;
 pub mod draft;
 pub mod elevation;

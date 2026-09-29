@@ -203,7 +203,26 @@ Lumina 把分析全部放到 Rust，并做了这些增强：
 - 同队至少 3 场才列出，最多 10 人，按同队场数排序；名字用 `/lol-summoner/v2/summoners/puuid/{puuid}` 并发查询，查不到就显示「未知玩家」。
 - 另算「和这些人任意一人同队」与「其余对局」两组的胜率，用来看有没有固定队友时状态更好。
 
-### 3.3.10 悬停提示
+### 3.3.10 自动 BP（`services/auto_select.rs`、`src/views/AutoSelectView.vue`）
+设置项 `auto_select`：自动禁用、自动选择两个开关，锁定延迟（0–10 秒），以及按分路的预设。
+预设的键是 `TOP / JUNGLE / MIDDLE / BOTTOM / UTILITY / ANY`，每个分路各有一份「禁用」和「选择」列表，最多 10 个，越靠前越优先。
+- **触发**：监听 `/lol-champ-select/v1/session`。自己的 ban 或 pick 轮到（`isInProgress`）且还没有预选英雄时才动手；
+  已经点了英雄就不替你换。同一个 action 只处理一次，离开选人阶段后清空记录。
+- **取哪个**：先取该分路的列表，再接「通用」（`ANY`）的列表；分路取自 `myTeam[].assignedPosition`，没有时只用「通用」。
+  按顺序取第一个客户端允许的：禁用看 `bannable-champion-ids`，选择看 `pickable-champion-ids`。
+  禁用还会跳过自己和队友正在预选（`championId`）或已表态（`championPickIntent`）的英雄，免得禁掉队友要玩的。
+- **动作**：`PATCH /lol-champ-select/v1/session/actions/{id}`（`{championId}`）预选，等延迟后重新读一次会话，
+  只有这个 action 还开着、且预选的还是刚才那个英雄，才 `POST .../complete` 锁定；期间你换了英雄就不锁。
+
+### 3.3.11 客户端小工具（`services/client_tools.rs`、`src/views/ToolsView.vue`）
+- **在线状态与签名**：`PUT /lol-chat/v1/me`，状态为 `chat`（在线）/ `away`（离开）/ `offline`（隐身），签名最多 100 字。
+- **生涯背景**：`/lol-champions/v1/inventories/{summonerId}/champions/{id}/skins` 列出某英雄的皮肤和是否拥有，
+  `POST /lol-summoner/v1/current-summoner/summoner-profile`（`{key: "backgroundSkinId", value}`）设置，当前背景从同一路径读取。
+- **重启客户端窗口**：`POST /riotclient/kill-and-restart-ux`，只重启客户端界面进程，游戏不受影响；前端要点两次确认。
+  重启会断开 LCU 连接，`lcu_connection` 会自动重连。
+- 以上接口没有在真实客户端上验证过，失败时把客户端返回的错误显示出来。
+
+### 3.3.12 悬停提示
 全局只有一个提示层（`TooltipLayer.vue`），元素上用 `v-tip`，同一时刻只显示一个，不会互相叠。
 - 装备、召唤师技能、符文的名称和说明来自 LCU 的 `items.json`、`summoner-spells.json`、`perks.json`。
   客户端的富文本标签在后端转成纯文本。

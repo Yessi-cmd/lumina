@@ -1,5 +1,6 @@
 //! User settings, persisted as JSON in the app config directory.
 
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -19,8 +20,63 @@ pub const MAX_TILT_STREAK: u32 = 10;
 /// Honor categories of the client: cool, shot caller, friendly.
 pub const HONOR_CATEGORIES: [&str; 3] = ["COOL", "SHOTCALLER", "HEART"];
 const DEFAULT_HONOR_CATEGORY: &str = "HEART";
+/// Positions with an auto-select preset; `ANY` backs up every position.
+pub const PRESET_POSITIONS: [&str; 6] = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY", "ANY"];
+const MAX_PRESET_LEN: usize = 10;
+const MAX_SELECT_DELAY_SECS: u32 = 10;
 /// Phone push channels: Bark (iOS) and Server酱 (WeChat).
 pub const PUSH_PROVIDERS: [&str; 3] = ["off", "bark", "serverchan"];
+
+/// Champions to ban and pick for one position, best first.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Preset {
+    pub picks: Vec<i64>,
+    pub bans: Vec<i64>,
+}
+
+/// Automatic ban and pick during champ select, see `services/auto_select.rs`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct AutoSelect {
+    pub ban: bool,
+    pub pick: bool,
+    /// Seconds between hovering a champion and locking it in.
+    pub delay_secs: u32,
+    /// Keyed by `PRESET_POSITIONS`.
+    pub presets: HashMap<String, Preset>,
+}
+
+impl Default for AutoSelect {
+    fn default() -> Self {
+        Self {
+            ban: false,
+            pick: false,
+            delay_secs: 1,
+            presets: HashMap::new(),
+        }
+    }
+}
+
+impl AutoSelect {
+    fn normalized(mut self) -> Self {
+        self.delay_secs = self.delay_secs.min(MAX_SELECT_DELAY_SECS);
+        let known = |position: &String| PRESET_POSITIONS.contains(&position.as_str());
+        self.presets.retain(|position, _| known(position));
+        for preset in self.presets.values_mut() {
+            clean_ids(&mut preset.picks);
+            clean_ids(&mut preset.bans);
+        }
+        self
+    }
+}
+
+/// Real champion ids only, each once, in order.
+fn clean_ids(ids: &mut Vec<i64>) {
+    let mut seen = HashSet::new();
+    ids.retain(|id| *id > 0 && seen.insert(*id));
+    ids.truncate(MAX_PRESET_LEN);
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -50,6 +106,7 @@ pub struct Settings {
     pub push_match_found: bool,
     pub push_champ_select: bool,
     pub push_tilt: bool,
+    pub auto_select: AutoSelect,
 }
 
 impl Default for Settings {
@@ -69,6 +126,7 @@ impl Default for Settings {
             push_match_found: true,
             push_champ_select: true,
             push_tilt: true,
+            auto_select: AutoSelect::default(),
         }
     }
 }
@@ -120,6 +178,7 @@ impl Settings {
             self.push_provider = "off".to_owned();
         }
         self.push_key = self.push_key.trim().to_owned();
+        self.auto_select = std::mem::take(&mut self.auto_select).normalized();
         self
     }
 }
@@ -160,5 +219,30 @@ mod tests {
         assert_eq!(s.honor_category, DEFAULT_HONOR_CATEGORY);
         assert_eq!(s.push_provider, "off");
         assert_eq!(s.push_key, "abc");
+    }
+
+    #[test]
+    fn cleans_auto_select_presets() {
+        let mut auto_select = AutoSelect {
+            delay_secs: 99,
+            ..AutoSelect::default()
+        };
+        let messy = Preset {
+            picks: vec![5, 0, 5, -3, 7],
+            bans: (1..=20).collect(),
+        };
+        auto_select.presets.insert("MIDDLE".to_owned(), messy);
+        let unknown = "MID".to_owned();
+        auto_select.presets.insert(unknown, Preset::default());
+        let s = Settings {
+            auto_select,
+            ..Settings::default()
+        };
+        let auto_select = s.normalized().auto_select;
+        assert_eq!(auto_select.delay_secs, MAX_SELECT_DELAY_SECS);
+        assert_eq!(auto_select.presets.len(), 1);
+        let preset = &auto_select.presets["MIDDLE"];
+        assert_eq!(preset.picks, vec![5, 7]);
+        assert_eq!(preset.bans.len(), MAX_PRESET_LEN);
     }
 }

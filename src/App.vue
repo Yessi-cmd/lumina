@@ -37,6 +37,8 @@ const navItems: { to: string; label: string; icon: IconName }[] = [
   { to: "/match-history", label: "战绩", icon: "history" },
   { to: "/rank", label: "段位", icon: "trending" },
   { to: "/ongoing-game", label: "对局", icon: "swords" },
+  { to: "/auto-select", label: "自动 BP", icon: "bolt" },
+  { to: "/tools", label: "工具", icon: "wrench" },
   { to: "/settings", label: "设置", icon: "settings" },
 ];
 

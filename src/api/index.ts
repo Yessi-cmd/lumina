@@ -471,6 +471,37 @@ export interface Settings {
   pushMatchFound: boolean;
   pushChampSelect: boolean;
   pushTilt: boolean;
+  autoSelect: AutoSelect;
+}
+
+/** Champions to ban and pick for one position, best first. */
+export interface Preset {
+  picks: number[];
+  bans: number[];
+}
+
+/** Automatic ban and pick in champ select. */
+export interface AutoSelect {
+  ban: boolean;
+  pick: boolean;
+  /** Seconds between hovering a champion and locking it in. */
+  delaySecs: number;
+  /** Keyed by TOP / JUNGLE / MIDDLE / BOTTOM / UTILITY; ANY backs up every position. */
+  presets: Record<string, Preset>;
+}
+
+/** chat = online, away, dnd = in game, offline = invisible, mobile. */
+export interface ChatStatus {
+  availability: string;
+  statusMessage: string;
+}
+
+export interface Skin {
+  id: number;
+  name: string;
+  owned: boolean;
+  /** LCU asset path of the tile; empty when the client gives none. */
+  tilePath: string;
 }
 
 /** A run of ranked losses worth a break. */
@@ -630,6 +661,14 @@ export const api = {
   rankHistory: (puuid: string | null = null) => invoke<RankHistory | null>("rank_history", { puuid }),
   teammates: (puuid: string, queue: number | null, range: CareerRange) =>
     invoke<Teammates>("teammates", { puuid, queue, range }),
+  chatStatus: () => invoke<ChatStatus>("chat_status"),
+  /** chat / away / offline. */
+  setChatAvailability: (status: string) => invoke<void>("set_chat_availability", { status }),
+  setChatStatusMessage: (message: string) => invoke<void>("set_chat_status_message", { message }),
+  championSkins: (championId: number) => invoke<Skin[]>("champion_skins", { championId }),
+  profileBackground: () => invoke<number>("profile_background"),
+  setProfileBackground: (skinId: number) => invoke<void>("set_profile_background", { skinId }),
+  restartClient: () => invoke<void>("restart_client"),
   tiltState: () => invoke<TiltWarning | null>("tilt_state"),
   dismissTilt: () => invoke<void>("dismiss_tilt"),
   pushTest: () => invoke<void>("push_test"),

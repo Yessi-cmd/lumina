@@ -15,6 +15,12 @@ export const router = createRouter({
       name: "ongoing-game",
       component: () => import("./views/OngoingGameView.vue"),
     },
+    {
+      path: "/auto-select",
+      name: "auto-select",
+      component: () => import("./views/AutoSelectView.vue"),
+    },
+    { path: "/tools", name: "tools", component: () => import("./views/ToolsView.vue") },
     { path: "/settings", name: "settings", component: () => import("./views/SettingsView.vue") },
   ],
 });
