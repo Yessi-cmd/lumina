@@ -177,7 +177,8 @@ async fn download(app: &AppHandle, asset: &GithubAsset, path: &Path) -> Result<(
         let message = format!("安装包不完整（{downloaded}/{total} 字节）");
         return Err(AppError::Message(message));
     }
-    if let Some(expected) = asset.digest.as_deref().and_then(|d| d.strip_prefix("sha256:")) {
+    let expected = asset.digest.as_deref();
+    if let Some(expected) = expected.and_then(|d| d.strip_prefix("sha256:")) {
         let actual = hex(&hasher.finalize());
         if !actual.eq_ignore_ascii_case(expected) {
             let _ = tokio::fs::remove_file(path).await;
