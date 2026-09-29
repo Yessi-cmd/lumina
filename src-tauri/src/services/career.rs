@@ -169,7 +169,7 @@ pub async fn load(
 }
 
 /// Newest first; the flag says whether the history goes on beyond what was read.
-async fn games(
+pub(super) async fn games(
     history: &MatchHistoryService,
     session: &LcuSession,
     puuid: &str,

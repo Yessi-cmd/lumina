@@ -578,6 +578,21 @@ export interface RankHistory {
   points: RankPoint[];
 }
 
+export interface TeammateRecord {
+  games: number;
+  wins: number;
+}
+
+/** Who a player queues with, and the record with and without them. */
+export interface Teammates {
+  /** Games that list their players. */
+  games: number;
+  /** Most games together first; `name` is empty when it could not be looked up. */
+  regulars: { puuid: string; name: string; games: number; wins: number }[];
+  withRegulars: TeammateRecord;
+  withoutRegulars: TeammateRecord;
+}
+
 /** Page size the backend prefetches for every player in the current game. */
 export const PANEL_HISTORY_COUNT = 20;
 
@@ -613,6 +628,8 @@ export const api = {
     invoke<Career>("career", { puuid, queue, range }),
   /** Without `puuid`, the account seen last. */
   rankHistory: (puuid: string | null = null) => invoke<RankHistory | null>("rank_history", { puuid }),
+  teammates: (puuid: string, queue: number | null, range: CareerRange) =>
+    invoke<Teammates>("teammates", { puuid, queue, range }),
   tiltState: () => invoke<TiltWarning | null>("tilt_state"),
   dismissTilt: () => invoke<void>("dismiss_tilt"),
   pushTest: () => invoke<void>("push_test"),

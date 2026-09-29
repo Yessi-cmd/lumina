@@ -4,6 +4,7 @@ import { api, type Career, type CareerRange, type Rates } from "../../api";
 import { useGameDataStore } from "../../stores/gameData";
 import { TIERS, tierText } from "../../utils/rank";
 import RadarChart from "./RadarChart.vue";
+import TeammatesCard from "./TeammatesCard.vue";
 import TrendChart from "./TrendChart.vue";
 
 const props = defineProps<{ puuid: string }>();
@@ -385,6 +386,8 @@ const maxPositionGames = computed(() => Math.max(1, ...(c.value?.positions.map((
               </div>
             </div>
           </div>
+
+          <TeammatesCard :puuid="puuid" :queue="mode" :range="range" />
         </template>
       </div>
     </Transition>

@@ -197,7 +197,13 @@ Lumina 把分析全部放到 Rust，并做了这些增强：
   有可点赞的队友就随机选一人，`POST /lol-honor-v2/v1/honor-player`，类型由 `honor_category` 决定。
   点赞接口的字段没有在真实客户端上验证过，失败只写日志，不影响其他功能。
 
-### 3.3.9 悬停提示
+### 3.3.9 搭档分析（`services/teammates.rs`、`src/components/career/TeammatesCard.vue`）
+生涯分析页底部的「常一起玩的人」，范围和模式筛选跟生涯分析一致，复用它已取到的战绩页（`career::games`，命中缓存）。
+- 只统计带全员名单的对局（SGP）。LCU 回退的战绩没有队友，重开和斗魂竞技场也不算。
+- 同队至少 3 场才列出，最多 10 人，按同队场数排序；名字用 `/lol-summoner/v2/summoners/puuid/{puuid}` 并发查询，查不到就显示「未知玩家」。
+- 另算「和这些人任意一人同队」与「其余对局」两组的胜率，用来看有没有固定队友时状态更好。
+
+### 3.3.10 悬停提示
 全局只有一个提示层（`TooltipLayer.vue`），元素上用 `v-tip`，同一时刻只显示一个，不会互相叠。
 - 装备、召唤师技能、符文的名称和说明来自 LCU 的 `items.json`、`summoner-spells.json`、`perks.json`。
   客户端的富文本标签在后端转成纯文本。

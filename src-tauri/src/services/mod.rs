@@ -21,6 +21,7 @@ pub mod ranked_champions;
 pub mod roster_insights;
 pub mod roster_relations;
 pub mod summoner;
+pub mod teammates;
 pub mod tilt;
 pub mod timeline;
 pub mod update_check;

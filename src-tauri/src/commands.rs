@@ -17,6 +17,7 @@ use crate::services::player_profile::{PlayerProfile, ProfileContext};
 use crate::services::rank_history::RankHistory;
 use crate::services::ranked_champions::RankedChampions;
 use crate::services::roster_insights::RosterInsights;
+use crate::services::teammates::Teammates;
 use crate::services::tilt::TiltWarning;
 use crate::services::update_check::UpdateInfo;
 use crate::state::ongoing::Roster;
@@ -156,6 +157,19 @@ pub async fn career(
     let session = state.session()?;
     let history = &state.match_history;
     services::career::load(history, &session, &puuid, queue, range).await
+}
+
+/// The teammates a player queues with most, and the record with and without them.
+#[tauri::command]
+pub async fn teammates(
+    state: State<'_, AppState>,
+    puuid: String,
+    queue: Option<i64>,
+    range: Range,
+) -> Result<Teammates> {
+    let session = state.session()?;
+    let history = &state.match_history;
+    services::teammates::load(history, &session, &puuid, queue, range).await
 }
 
 /// Recorded rank changes of `puuid` (default: the account seen last); later changes
