@@ -70,6 +70,8 @@ watch(
 watch(
   lane,
   async (position) => {
+    // A hand-picked opponent belongs to the lane it was picked for.
+    pinnedOpponent.value = 0;
     tierList.value = null;
     listError.value = null;
     try {
@@ -344,7 +346,9 @@ async function apply() {
             v-model="opponentQuery"
             placeholder="搜索英雄，指定对位…"
             class="field mt-2 w-full py-1 text-xs"
+            @keydown.enter="opponentResults.length && pinOpponent(opponentResults[0])"
           />
+          <p v-if="opponentQuery.trim() && !opponentResults.length" class="mt-1 text-zinc-500">没有匹配的英雄</p>
           <div v-if="opponentResults.length" class="mt-1 flex flex-wrap gap-1">
             <button
               v-for="id in opponentResults"
@@ -421,6 +425,7 @@ async function apply() {
       </div>
       <p v-if="listError" class="text-xs text-red-400">{{ listError }}</p>
       <p v-else-if="!tierList" class="text-xs text-zinc-500">加载中…</p>
+      <p v-else-if="!visible.length" class="text-xs text-zinc-500">这个位置暂时没有数据。</p>
       <div v-else class="grid grid-cols-2 gap-1">
         <button
           v-for="e in visible"
