@@ -86,11 +86,19 @@ function championOf(puuid: string): number {
           {{ a.title }}
         </div>
       </TransitionGroup>
-      <span v-else-if="roster && !insights" class="flex items-center gap-2 text-xs text-zinc-500">
+      <span v-if="roster && ongoing.loading" class="flex items-center gap-2 text-xs text-zinc-500">
         <span class="size-3 animate-spin rounded-full border-2 border-zinc-600 border-t-amber-400" />
-        正在分析双方战绩与对线数据…
+        {{ insights ? "基础结果已显示，正在补充战力与对线数据…" : "正在分析近期战绩…" }}
       </span>
     </header>
+
+    <div v-if="roster && ongoing.analysisError" role="alert" class="flex items-center gap-3 text-xs text-amber-300">
+      <span>{{ ongoing.analysisError }}</span>
+      <button class="btn-ghost" :disabled="ongoing.loading" @click="ongoing.refreshInsights()">重试分析</button>
+    </div>
+    <p v-for="warning in insights?.warnings ?? []" :key="warning" class="text-xs text-zinc-500">
+      {{ warning }}
+    </p>
 
     <p v-if="!lcu.connected" class="empty-state">连接英雄联盟客户端后显示对局信息。</p>
     <p v-else-if="!roster" class="empty-state">

@@ -438,6 +438,7 @@ export interface Advice {
 }
 
 export interface RosterInsights {
+  warnings: string[];
   premades: { name: string; members: string[]; allies: boolean; sharedGames: number }[];
   /** Roster-wide tags (premade, met, gank, lane, horses) per puuid. */
   tags: Record<string, PlayerTag[]>;
@@ -649,7 +650,7 @@ export const api = {
   ongoingRoster: () => invoke<Roster | null>("ongoing_roster"),
   playerProfile: (puuid: string, championId: number, queueId: number, position: string) =>
     invoke<PlayerProfile>("player_profile", { puuid, championId, queueId, position }),
-  rosterInsights: () => invoke<RosterInsights>("roster_insights"),
+  rosterInsights: (detailed = true) => invoke<RosterInsights>("roster_insights", { detailed }),
   settings: () => invoke<Settings>("settings"),
   saveSettings: (settings: Settings) => invoke<Settings>("save_settings", { settings }),
   autoAcceptState: () => invoke<PendingAccept | null>("auto_accept_state"),

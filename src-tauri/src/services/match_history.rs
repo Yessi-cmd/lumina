@@ -3,7 +3,7 @@
 //! champ-select panel (M4) can ask for 5–10 players at once.
 
 use std::collections::HashMap;
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError, Weak};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
@@ -158,6 +158,7 @@ pub struct GameParticipant {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct PageRequest {
+    session_id: u64,
     puuid: String,
     start: u32,
     count: u32,
@@ -186,6 +187,7 @@ impl PageRequest {
 pub struct MatchHistoryService {
     limiter: Semaphore,
     cache: Mutex<HashMap<PageRequest, (Instant, MatchHistoryPage)>>,
+    in_flight: Mutex<HashMap<PageRequest, Weak<tokio::sync::Mutex<()>>>>,
 }
 
 impl Default for MatchHistoryService {
@@ -193,6 +195,7 @@ impl Default for MatchHistoryService {
         Self {
             limiter: Semaphore::new(MAX_CONCURRENT),
             cache: Mutex::default(),
+            in_flight: Mutex::default(),
         }
     }
 }
@@ -219,6 +222,7 @@ impl MatchHistoryService {
         queue: Option<i64>,
     ) -> Result<MatchHistoryPage> {
         let req = PageRequest {
+            session_id: session.id,
             puuid: puuid.to_owned(),
             start,
             count: count.clamp(1, MAX_PAGE_SIZE),
@@ -228,6 +232,11 @@ impl MatchHistoryService {
             return Ok(page);
         }
 
+        let flight = self.request_lock(&req);
+        let _flight = flight.lock().await;
+        if let Some(page) = self.cached(&req) {
+            return Ok(page);
+        }
         let permit = self.limiter.acquire().await;
         let _permit = permit.expect("semaphore is never closed");
         // Another caller may have fetched the same page while we waited.
@@ -251,16 +260,30 @@ impl MatchHistoryService {
         queue: Option<i64>,
     ) -> Result<MatchHistoryPage> {
         let req = PageRequest {
+            session_id: session.id,
             puuid: puuid.to_owned(),
             start,
             count: count.clamp(1, MAX_PAGE_SIZE),
             queue,
         };
+        let flight = self.request_lock(&req);
+        let _flight = flight.lock().await;
         let permit = self.limiter.acquire().await;
         let _permit = permit.expect("semaphore is never closed");
         let page = fetch(session, &req).await?;
         self.store(req, page.clone());
         Ok(page)
+    }
+
+    fn request_lock(&self, req: &PageRequest) -> Arc<tokio::sync::Mutex<()>> {
+        let mut flights = self.in_flight.lock().unwrap_or_else(PoisonError::into_inner);
+        flights.retain(|_, lock| lock.strong_count() > 0);
+        if let Some(lock) = flights.get(req).and_then(Weak::upgrade) {
+            return lock;
+        }
+        let lock = Arc::new(tokio::sync::Mutex::new(()));
+        flights.insert(req.clone(), Arc::downgrade(&lock));
+        lock
     }
 
     fn cached(&self, req: &PageRequest) -> Option<MatchHistoryPage> {
@@ -648,6 +671,31 @@ fn game_result(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn duplicate_pages_share_a_lock_but_connections_do_not() {
+        let service = MatchHistoryService::default();
+        let first = PageRequest {
+            session_id: 1,
+            puuid: "player".to_owned(),
+            start: 0,
+            count: 20,
+            queue: None,
+        };
+        let mut other = first.clone();
+        other.session_id = 2;
+        let lock = service.request_lock(&first);
+        let duplicate = service.request_lock(&first);
+        assert!(Arc::ptr_eq(&lock, &duplicate));
+        assert!(!Arc::ptr_eq(&lock, &service.request_lock(&other)));
+        let guard = lock.lock().await;
+        assert!(duplicate.try_lock().is_err());
+        drop(guard);
+        assert!(duplicate.try_lock().is_ok());
+        service.store(first.clone(), first.page(DataSource::Sgp, None, Vec::new()));
+        assert!(service.cached(&first).is_some());
+        assert!(service.cached(&other).is_none());
+    }
     use crate::clients::sgp::models::SgpMatchHistory;
 
     #[test]

@@ -29,6 +29,7 @@
 - 所有状态由 Rust 维护，前端只做展示。
 - LCU WebSocket 事件 → 更新 `state` → emit Tauri event → Pinia store。
 - 前端不直接访问 LCU/SGP，拿不到任何 token。
+- 每次连接使用独立编号；战绩、详情和时间线缓存包含连接编号，旧连接结果不用于新连接。
 - 窗口无原生边框（`decorations: false`），标题栏与最小化/最大化/关闭按钮由 `TitleBar.vue` 自绘，
   拖动区域用 `data-tauri-drag-region`。主题色集中在 `style.css`：zinc 色阶被重定义为 Lumina 的中性色，
   通用样式为 `.card` / `.btn-*` / `.field` / `.segmented`，图标为内联 SVG（`AppIcon.vue`），不引入组件库或图标包。
@@ -113,6 +114,7 @@ Lumina 把分析全部放到 Rust，并做了这些增强：
   同一事实对敌我语气相反（敌方好抓是机会，我方好抓是提醒）。
 - **建议**：敌方软柿子与硬骨头、最大优势路与劣势路；选人阶段只有我方信息时提示需要照顾的队友。
 - 所有阈值在各模块的 `limits` 中，均有单元测试。
+- 对局分析先返回基础关系标签，再补充战力和时间线分析；失败时保留已有结果并提供重试。
 
 ### 3.3.4 选英雄助手（`clients/lolalytics.rs`、`services/champion_assist.rs`）
 - 数据：lolalytics 网站自用接口 `a1.lolalytics.com/mega/`：`ep=list`（某位置全部英雄的排名、Tier 1–15、胜率/选取/禁用）
@@ -216,6 +218,7 @@ Lumina 把分析全部放到 Rust，并做了这些增强：
   禁用还会跳过自己和队友正在预选（`championId`）或已表态（`championPickIntent`）的英雄，免得禁掉队友要玩的。
 - **动作**：`PATCH /lol-champ-select/v1/session/actions/{id}`（`{championId}`）预选，等延迟后重新读一次会话，
   只有这个 action 还开着、且预选的还是刚才那个英雄，才 `POST .../complete` 锁定；期间你换了英雄就不锁。
+- 预选与锁定前均校验连接、阶段和设置；修改自动 BP 设置、离开选人或断线会使待执行任务失效。
 
 ### 3.3.11 客户端小工具（`services/client_tools.rs`、`src/views/ToolsView.vue`）
 - **在线状态与签名**：`PUT /lol-chat/v1/me`，状态为 `chat`（在线）/ `away`（离开）/ `offline`（隐身），签名最多 100 字。
@@ -234,6 +237,7 @@ Lumina 把分析全部放到 Rust，并做了这些增强：
 ### 3.4 性能
 - 战绩请求并发上限 5（`tokio::sync::Semaphore`）。
 - LRU 缓存 `(puuid, 分页)`，TTL 5 分钟。
+- 同一连接的相同战绩页请求共享执行锁，预取与玩家卡片不会并行重复拉取同一页。
 - 游戏图片走自定义协议 `lcu-asset://`（WebView 中为 `http://lcu-asset.localhost/<LCU 路径>`），
   只放行 `/lol-game-data/assets/`，由 Rust 带认证取回并缓存到 app cache 目录。
 

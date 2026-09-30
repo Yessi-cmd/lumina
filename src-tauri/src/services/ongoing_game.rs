@@ -73,7 +73,10 @@ async fn load_lobby(app: AppHandle) {
         return;
     };
     match session.http.get::<LobbySession>(LOBBY).await {
-        Ok(lobby) => apply_lobby(&app, lobby),
+        Ok(lobby) if app.state::<AppState>().is_current_session(&session) => {
+            apply_lobby(&app, lobby);
+        }
+        Ok(_) => {}
         Err(err) => log::debug!("no lobby: {err}"),
     }
 }
@@ -140,7 +143,10 @@ async fn load_queue(app: AppHandle) {
         return;
     };
     match session.http.get::<GameflowSession>(GAMEFLOW_SESSION).await {
-        Ok(gs) => apply_gameflow(&app, gs),
+        Ok(gs) if app.state::<AppState>().is_current_session(&session) => {
+            apply_gameflow(&app, gs);
+        }
+        Ok(_) => {}
         Err(err) => log::debug!("failed to load gameflow session: {err}"),
     }
 }
@@ -189,6 +195,9 @@ async fn recover_roster(app: AppHandle, game_id: i64, self_puuid: String) {
         if delay > 0 {
             tokio::time::sleep(Duration::from_secs(delay)).await;
         }
+        if !app.state::<AppState>().is_current_session(&session) {
+            return;
+        }
         let Some(current) = app.state::<AppState>().roster() else {
             return;
         };
@@ -210,7 +219,10 @@ async fn recover_roster(app: AppHandle, game_id: i64, self_puuid: String) {
             }
         };
         match sgp.current_game(&token, &self_puuid).await {
-            Ok(Some(response)) if response.game.id == game_id => {
+            Ok(Some(response))
+                if response.game.id == game_id
+                    && app.state::<AppState>().is_current_session(&session) =>
+            {
                 let Some(mut current) = app.state::<AppState>().roster() else {
                     return;
                 };

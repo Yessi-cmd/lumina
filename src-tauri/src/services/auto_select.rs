@@ -7,6 +7,7 @@
 //! is hovering or has declared.
 
 use std::collections::HashSet;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, PoisonError};
 use std::time::Duration;
 
@@ -139,6 +140,7 @@ fn choose(candidates: &[i64], available: &[i64], avoid: &HashSet<i64>) -> Option
 #[derive(Default)]
 pub struct AutoSelectState {
     handled: Mutex<HashSet<i64>>,
+    generation: AtomicU64,
 }
 
 impl AutoSelectState {
@@ -148,7 +150,8 @@ impl AutoSelectState {
         handled.insert(action_id)
     }
 
-    fn clear(&self) {
+    pub fn clear(&self) {
+        self.generation.fetch_add(1, Ordering::SeqCst);
         let mut handled = self.handled.lock().unwrap_or_else(PoisonError::into_inner);
         handled.clear();
     }
@@ -162,6 +165,7 @@ pub fn on_phase(app: &AppHandle, phase: &str) {
 
 pub fn on_champ_select(app: &AppHandle, event: &LcuEvent) {
     if event.event_type == LcuEventType::Delete {
+        app.state::<AppState>().auto_select.clear();
         return;
     }
     let state = app.state::<AppState>();
@@ -180,19 +184,42 @@ pub fn on_champ_select(app: &AppHandle, event: &LcuEvent) {
         Kind::Pick => config.pick,
     };
     if wanted && state.auto_select.claim(turn.action_id) {
-        tauri::async_runtime::spawn(run(app.clone(), turn, config));
+        let generation = state.auto_select.generation.load(Ordering::SeqCst);
+        if let Ok(lcu) = state.session() {
+            tauri::async_runtime::spawn(run(app.clone(), turn, config, lcu, generation));
+        }
     }
 }
 
-async fn run(app: AppHandle, turn: Turn, config: AutoSelect) {
-    if let Err(err) = select(&app, &turn, &config).await {
+async fn run(
+    app: AppHandle,
+    turn: Turn,
+    config: AutoSelect,
+    session: std::sync::Arc<crate::state::session::LcuSession>,
+    generation: u64,
+) {
+    if let Err(err) = select(&app, &turn, &config, &session, generation).await {
         log::warn!("auto {:?} failed: {err}", turn.kind);
     }
 }
 
-async fn select(app: &AppHandle, turn: &Turn, config: &AutoSelect) -> Result<()> {
+async fn select(
+    app: &AppHandle,
+    turn: &Turn,
+    config: &AutoSelect,
+    session: &crate::state::session::LcuSession,
+    generation: u64,
+) -> Result<()> {
     let state = app.state::<AppState>();
-    let session = state.session()?;
+    let active = || {
+        state.is_current_session(session)
+            && state.auto_select.generation.load(Ordering::SeqCst) == generation
+            && state.lcu_snapshot().gameflow_phase == "ChampSelect"
+            && state.settings().auto_select == *config
+    };
+    if !active() {
+        return Ok(());
+    }
     let list = match turn.kind {
         Kind::Ban => BANNABLE,
         Kind::Pick => PICKABLE,
@@ -208,16 +235,23 @@ async fn select(app: &AppHandle, turn: &Turn, config: &AutoSelect) -> Result<()>
     };
 
     let action = format!("{ACTIONS}/{}", turn.action_id);
+    let now: Session = session.http.get(SESSION).await?;
+    if !active() || now.my_turn().as_ref() != Some(turn) {
+        return Ok(());
+    }
     let hover = json!({ "championId": champion });
     session
         .http
         .send_json(Method::PATCH, &action, Some(&hover))
         .await?;
     tokio::time::sleep(Duration::from_secs(u64::from(config.delay_secs))).await;
+    if !active() {
+        return Ok(());
+    }
 
     // The player may have chosen something else, or the turn may be over.
     let now: Session = session.http.get(SESSION).await?;
-    if !now.is_hovering(turn.action_id, champion) {
+    if !active() || !now.is_hovering(turn.action_id, champion) {
         log::info!("auto {:?}: left alone, the player chose", turn.kind);
         return Ok(());
     }
@@ -230,6 +264,17 @@ async fn select(app: &AppHandle, turn: &Turn, config: &AutoSelect) -> Result<()>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn clearing_invalidates_pending_actions_even_if_ids_are_reused() {
+        let state = AutoSelectState::default();
+        assert!(state.claim(1));
+        let generation = state.generation.load(Ordering::SeqCst);
+        state.clear();
+        assert_ne!(state.generation.load(Ordering::SeqCst), generation);
+        assert!(state.claim(1));
+        assert!(!state.claim(1));
+    }
     use crate::config::Preset;
 
     fn session(json: &str) -> Session {

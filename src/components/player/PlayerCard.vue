@@ -51,13 +51,15 @@ const DOT: Record<GameResult, string> = {
 
 watch(
   () => props.player.puuid,
-  (puuid) => {
+  (puuid, _previous, onCleanup) => {
+    let active = true;
+    onCleanup(() => { active = false; });
     summoner.value = null;
     profile.value = null;
     api
       .summonerByPuuid(puuid)
       .then((s) => {
-        if (puuid === props.player.puuid) summoner.value = s;
+        if (active) summoner.value = s;
       })
       .catch(() => {});
   },
@@ -67,13 +69,15 @@ watch(
 // Re-evaluated when the pick changes (practice / signature tags) or the queue becomes known.
 watch(
   () => [props.player.puuid, props.player.championId, props.queueId, props.player.position] as const,
-  async ([puuid, championId, queueId, position]) => {
+  async ([puuid, championId, queueId, position], _previous, onCleanup) => {
+    let active = true;
+    onCleanup(() => { active = false; });
     error.value = null;
     try {
       const p = await api.playerProfile(puuid, championId, queueId, position);
-      if (puuid === props.player.puuid) profile.value = p;
+      if (active) profile.value = p;
     } catch (err) {
-      if (puuid === props.player.puuid) error.value = String(err);
+      if (active) error.value = String(err);
     }
   },
   { immediate: true },

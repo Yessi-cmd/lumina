@@ -70,10 +70,12 @@ pub async fn match_history(
     queue: Option<i64>,
 ) -> Result<MatchHistoryPage> {
     let session = state.session()?;
-    state
+    let page = state
         .match_history
         .get_queue(&session, &puuid, start, count, queue)
-        .await
+        .await?;
+    state.ensure_current_session(&session)?;
+    Ok(page)
 }
 
 #[tauri::command]
@@ -109,13 +111,18 @@ pub async fn player_profile(
         position,
         champion_points,
     };
-    services::player_profile::load(&state.match_history, &session, &puuid, &ctx).await
+    let profile = services::player_profile::load(&state.match_history, &session, &puuid, &ctx).await?;
+    state.ensure_current_session(&session)?;
+    Ok(profile)
 }
 
 /// Premades, "met before", early-game tags and the 上等马 / 下等马 comparison for the roster.
 #[tauri::command]
-pub async fn roster_insights(state: State<'_, AppState>) -> Result<RosterInsights> {
-    services::roster_insights::load(&state).await
+pub async fn roster_insights(
+    state: State<'_, AppState>,
+    detailed: Option<bool>,
+) -> Result<RosterInsights> {
+    services::roster_insights::load(&state, detailed.unwrap_or(true)).await
 }
 
 #[tauri::command]
@@ -130,7 +137,11 @@ pub fn save_settings(
     state: State<'_, AppState>,
     settings: Settings,
 ) -> Result<Settings> {
+    let previous = state.settings().auto_select;
     let saved = state.set_settings(settings)?;
+    if saved.auto_select != previous {
+        state.auto_select.clear();
+    }
     if !saved.auto_accept {
         services::auto_accept::cancel(&app);
     }
@@ -288,7 +299,9 @@ pub fn log_frontend(level: String, message: String) {
 #[tauri::command]
 pub async fn game_detail(state: State<'_, AppState>, game_id: i64) -> Result<GameDetail> {
     let session = state.session()?;
-    state.game_details.get(&session, game_id).await
+    let detail = state.game_details.get(&session, game_id).await?;
+    state.ensure_current_session(&session)?;
+    Ok(detail)
 }
 
 /// Champions ranked for a position, from lolalytics at the configured rank filter.
@@ -347,7 +360,9 @@ pub async fn champion_matchups(
 #[tauri::command]
 pub async fn game_builds(state: State<'_, AppState>, game_id: i64) -> Result<Vec<PlayerBuild>> {
     let session = state.session()?;
-    state.game_details.builds(&session, game_id).await
+    let builds = state.game_details.builds(&session, game_id).await?;
+    state.ensure_current_session(&session)?;
+    Ok(builds)
 }
 
 /// Newest release on GitHub against the running version.

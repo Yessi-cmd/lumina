@@ -13,7 +13,7 @@ use super::ongoing_game::PANEL_HISTORY_COUNT;
 use super::player_profile::{self, PlayerProfile, PlayerTag, ProfileContext};
 use super::roster_relations::{self, PremadeGroup};
 use super::timeline::{EarlyGame, EarlyStats, GameDigest};
-use crate::error::Result;
+use crate::error::{AppError, Result};
 use crate::state::ongoing::Roster;
 use crate::state::session::LcuSession;
 use crate::state::AppState;
@@ -30,6 +30,7 @@ const TIMELINE_GAMES: usize = 8;
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RosterInsights {
+    pub warnings: Vec<String>,
     pub premades: Vec<PremadeGroup>,
     /// Roster-wide tags per puuid; the frontend merges them with profile tags.
     pub tags: HashMap<String, Vec<PlayerTag>>,
@@ -38,7 +39,7 @@ pub struct RosterInsights {
     pub advice: Vec<Advice>,
 }
 
-pub async fn load(state: &AppState) -> Result<RosterInsights> {
+pub async fn load(state: &AppState, detailed: bool) -> Result<RosterInsights> {
     let Some(roster) = state.roster() else {
         return Ok(RosterInsights::default());
     };
@@ -56,12 +57,37 @@ pub async fn load(state: &AppState) -> Result<RosterInsights> {
         .map(|puuid| history.get(&session, puuid, 0, PANEL_HISTORY_COUNT));
     let results = futures_util::future::join_all(requests).await;
     let pages: Vec<MatchHistoryPage> = results.into_iter().flatten().collect();
+    if !puuids.is_empty() && pages.is_empty() {
+        return Err(AppError::Message("暂时无法获取玩家战绩，请重试".to_owned()));
+    }
+    let mut warnings = Vec::new();
+    if pages.len() < puuids.len() {
+        warnings.push("部分玩家战绩获取失败，分析结果不完整".to_owned());
+    }
+    if pages.iter().any(|p| p.source == DataSource::Lcu) {
+        warnings.push("部分战绩使用客户端数据，关系与对线分析可能不完整".to_owned());
+    }
 
     let now = roster_relations::now_ms();
     let relations = roster_relations::analyze(&roster, &self_puuid, &pages, now);
+    if !state.is_current_session(&session) {
+        return Err(AppError::NotConnected);
+    }
+    if !detailed {
+        return Ok(RosterInsights {
+            warnings,
+            premades: relations.premades,
+            tags: relations.tags,
+            ..RosterInsights::default()
+        });
+    }
     let ranked = ranked_games(state, &session, &roster, &pages).await;
+    state.ensure_current_session(&session)?;
     let profiles = profiles(&roster, &pages, &ranked);
     let early = early_stats(state, &session, &ranked).await;
+    if !state.is_current_session(&session) {
+        return Err(AppError::NotConnected);
+    }
     let matchup = matchup::analyze(&roster, &profiles, &early);
 
     let from_sgp = pages.iter().filter(|p| p.source == DataSource::Sgp);
@@ -79,6 +105,7 @@ pub async fn load(state: &AppState) -> Result<RosterInsights> {
         tags.entry(puuid).or_default().extend(extra);
     }
     Ok(RosterInsights {
+        warnings,
         premades: relations.premades,
         tags,
         powers: matchup.powers,

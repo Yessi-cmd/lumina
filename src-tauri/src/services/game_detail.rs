@@ -122,7 +122,8 @@ pub struct ItemPurchase {
     pub at: i64,
 }
 
-type Cache<T> = Mutex<(HashMap<i64, T>, VecDeque<i64>)>;
+type GameKey = (u64, i64);
+type Cache<T> = Mutex<(HashMap<GameKey, T>, VecDeque<GameKey>)>;
 
 #[derive(Default)]
 pub struct GameDetailService {
@@ -132,17 +133,19 @@ pub struct GameDetailService {
 
 impl GameDetailService {
     pub async fn get(&self, session: &LcuSession, game_id: i64) -> Result<GameDetail> {
-        if let Some(detail) = cached(&self.details, game_id) {
+        let key = (session.id, game_id);
+        if let Some(detail) = cached(&self.details, key) {
             return Ok(detail);
         }
         let detail = fetch(session, game_id).await?;
-        store(&self.details, game_id, detail.clone());
+        store(&self.details, key, detail.clone());
         Ok(detail)
     }
 
     /// Needs SGP: LCU does not serve timelines for other players' games reliably.
     pub async fn builds(&self, session: &LcuSession, game_id: i64) -> Result<Vec<PlayerBuild>> {
-        if let Some(builds) = cached(&self.builds, game_id) {
+        let key = (session.id, game_id);
+        if let Some(builds) = cached(&self.builds, key) {
             return Ok(builds);
         }
         let Some(sgp) = &session.sgp else {
@@ -151,17 +154,17 @@ impl GameDetailService {
         let token = entitlements_token(session).await?;
         let details = sgp.game_details(&token, game_id).await?;
         let builds = builds_from(&details.json);
-        store(&self.builds, game_id, builds.clone());
+        store(&self.builds, key, builds.clone());
         Ok(builds)
     }
 }
 
-fn cached<T: Clone>(cache: &Cache<T>, game_id: i64) -> Option<T> {
+fn cached<T: Clone>(cache: &Cache<T>, game_id: GameKey) -> Option<T> {
     let cache = cache.lock().unwrap_or_else(PoisonError::into_inner);
     cache.0.get(&game_id).cloned()
 }
 
-fn store<T>(cache: &Cache<T>, game_id: i64, value: T) {
+fn store<T>(cache: &Cache<T>, game_id: GameKey, value: T) {
     let mut cache = cache.lock().unwrap_or_else(PoisonError::into_inner);
     let (values, order) = &mut *cache;
     if values.insert(game_id, value).is_none() {
@@ -442,6 +445,15 @@ fn builds_from(timeline: &SgpTimeline) -> Vec<PlayerBuild> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn same_game_id_is_isolated_between_connections() {
+        let cache: Cache<i64> = Mutex::default();
+        store(&cache, (1, 42), 100);
+        store(&cache, (2, 42), 200);
+        assert_eq!(cached(&cache, (1, 42)), Some(100));
+        assert_eq!(cached(&cache, (2, 42)), Some(200));
+    }
     use crate::clients::sgp::models::SgpGame;
 
     #[test]

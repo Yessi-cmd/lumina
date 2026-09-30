@@ -191,7 +191,14 @@ async fn load(app: AppHandle) {
     };
     let request = session.http.get::<DraftSession>(CHAMP_SELECT_SESSION);
     match request.await {
-        Ok(draft) => update(&app, draft),
+        Ok(draft)
+            if app.state::<AppState>().is_current_session(&session)
+                && app.state::<AppState>().lcu_snapshot().gameflow_phase == "ChampSelect"
+                && enabled(&app) =>
+        {
+            update(&app, draft);
+        }
+        Ok(_) => {}
         Err(err) => log::debug!("no champ select session for the draft: {err}"),
     }
 }
@@ -238,17 +245,25 @@ async fn analyze(app: AppHandle, session: DraftSession, generation: u64) {
         }
     };
     let board = board(&session, &shares);
+    if !state.is_current_session(&lcu) || GENERATION.load(Ordering::SeqCst) != generation {
+        return;
+    }
     publish(&app, generation, Some(board.draft.clone()));
 
     let mut draft = board.draft.clone();
     for enemy in &mut draft.enemies {
+        if !state.is_current_session(&lcu) || GENERATION.load(Ordering::SeqCst) != generation {
+            return;
+        }
         if enemy.advice == Advice::Loading {
             let tier = &settings.matchup_tier;
             let advice = advise(&state, &lcu, &board, tier, enemy).await;
             enemy.advice = advice;
         }
     }
-    publish(&app, generation, Some(draft));
+    if state.is_current_session(&lcu) {
+        publish(&app, generation, Some(draft));
+    }
 }
 
 fn publish(app: &AppHandle, generation: u64, draft: Option<Draft>) {

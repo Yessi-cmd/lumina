@@ -42,7 +42,7 @@ pub fn on_phase(app: &AppHandle, phase: &str) {
         "ReadyCheck" => {
             let auto = app.state::<AppState>().settings().auto_accept;
             let body = if auto {
-                "已自动接受，马上进入英雄选择"
+                "已开启自动接受，请留意客户端是否成功进入英雄选择"
             } else {
                 "请尽快回到电脑接受对局"
             };

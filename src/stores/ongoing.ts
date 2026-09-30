@@ -6,6 +6,9 @@ import { api, events, type Roster, type RosterInsights } from "../api";
 export const useOngoingStore = defineStore("ongoing", () => {
   const roster = shallowRef<Roster | null>(null);
   const insights = shallowRef<RosterInsights | null>(null);
+  const loading = shallowRef(false);
+  const analysisError = shallowRef<string | null>(null);
+  let requestId = 0;
   let started = false;
 
   async function start() {
@@ -23,24 +26,36 @@ export const useOngoingStore = defineStore("ongoing", () => {
   // Roster-wide analysis depends on who is in the game and the queue, not on picks.
   const playersKey = (r: Roster | null) => {
     if (!r) return "";
-    const puuids = [...r.allies, ...r.enemies].map((p) => p.puuid).sort();
-    return [r.gameId, r.queueId, ...puuids].join(",");
+    const members = (players: Roster["allies"]) =>
+      players.map((p) => `${p.puuid}:${p.position}`).sort().join(",");
+    return [r.stage, r.gameId, r.queueId, members(r.allies), members(r.enemies)].join("|");
   };
 
-  watch(
-    () => playersKey(roster.value),
-    async (key) => {
-      insights.value = null;
-      if (!key) return;
-      try {
-        // Waits for every history (usually prefetched) and a few timelines per player.
-        const result = await api.rosterInsights();
-        if (key === playersKey(roster.value)) insights.value = result;
-      } catch (err) {
+  async function refreshInsights() {
+    const id = ++requestId;
+    const key = playersKey(roster.value);
+    const current = () => id === requestId && key === playersKey(roster.value);
+    insights.value = null;
+    analysisError.value = null;
+    loading.value = !!key;
+    if (!key) return;
+    try {
+      const basic = await api.rosterInsights(false);
+      if (!current()) return;
+      insights.value = basic;
+      const detailed = await api.rosterInsights(true);
+      if (current()) insights.value = detailed;
+    } catch (err) {
+      if (current()) {
+        analysisError.value = insights.value ? "详细分析加载失败，已保留基础结果" : String(err);
         console.warn("Failed to load roster insights", err);
       }
-    },
-  );
+    } finally {
+      if (current()) loading.value = false;
+    }
+  }
 
-  return { roster, insights, start };
+  watch(() => playersKey(roster.value), refreshInsights, { flush: "sync" });
+
+  return { roster, insights, loading, analysisError, refreshInsights, start };
 });

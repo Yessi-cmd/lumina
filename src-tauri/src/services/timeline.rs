@@ -65,8 +65,8 @@ pub struct TimelineService {
 
 #[derive(Default)]
 struct Cache {
-    digests: HashMap<i64, Arc<GameDigest>>,
-    order: VecDeque<i64>,
+    digests: HashMap<(u64, i64), Arc<GameDigest>>,
+    order: VecDeque<(u64, i64)>,
 }
 
 impl Default for TimelineService {
@@ -85,7 +85,8 @@ impl TimelineService {
         session: &LcuSession,
         game: &GameSummary,
     ) -> Result<Arc<GameDigest>> {
-        if let Some(digest) = self.cached(game.game_id) {
+        let key = (session.id, game.game_id);
+        if let Some(digest) = self.cached(key) {
             return Ok(digest);
         }
         let Some(sgp) = &session.sgp else {
@@ -94,22 +95,22 @@ impl TimelineService {
 
         let permit = self.limiter.acquire().await;
         let _permit = permit.expect("semaphore is never closed");
-        if let Some(digest) = self.cached(game.game_id) {
+        if let Some(digest) = self.cached(key) {
             return Ok(digest);
         }
         let token = entitlements_token(session).await?;
         let details = sgp.game_details(&token, game.game_id).await?;
         let digest = Arc::new(digest(&details.json, &game.participants));
-        self.store(game.game_id, digest.clone());
+        self.store(key, digest.clone());
         Ok(digest)
     }
 
-    fn cached(&self, game_id: i64) -> Option<Arc<GameDigest>> {
+    fn cached(&self, game_id: (u64, i64)) -> Option<Arc<GameDigest>> {
         let cache = self.cache.lock().unwrap_or_else(PoisonError::into_inner);
         cache.digests.get(&game_id).cloned()
     }
 
-    fn store(&self, game_id: i64, digest: Arc<GameDigest>) {
+    fn store(&self, game_id: (u64, i64), digest: Arc<GameDigest>) {
         let mut cache = self.cache.lock().unwrap_or_else(PoisonError::into_inner);
         if cache.digests.insert(game_id, digest).is_none() {
             cache.order.push_back(game_id);
@@ -212,6 +213,15 @@ fn mean(values: &[i64]) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn timelines_do_not_cross_connections() {
+        let service = TimelineService::default();
+        let digest = Arc::new(GameDigest::new());
+        service.store((1, 42), digest.clone());
+        assert!(Arc::ptr_eq(&service.cached((1, 42)).unwrap(), &digest));
+        assert!(service.cached((2, 42)).is_none());
+    }
 
     fn participant(puuid: &str, team_id: i64, position: &str) -> GameParticipant {
         GameParticipant {

@@ -107,6 +107,7 @@ async fn run_session(app: &AppHandle, creds: &Credentials) -> Result<()> {
     let sgp_server = sgp.as_ref().map(|c| c.server().server.name.clone());
 
     let session = LcuSession {
+        id: crate::state::session::next_session_id(),
         http,
         sgp,
         game_data: OnceCell::new(),

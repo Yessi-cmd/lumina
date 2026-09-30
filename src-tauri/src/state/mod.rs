@@ -133,6 +133,18 @@ impl AppState {
         *guard = session;
     }
 
+    pub fn is_current_session(&self, session: &LcuSession) -> bool {
+        self.session().is_ok_and(|current| current.id == session.id)
+    }
+
+    pub fn ensure_current_session(&self, session: &LcuSession) -> Result<()> {
+        if self.is_current_session(session) {
+            Ok(())
+        } else {
+            Err(AppError::NotConnected)
+        }
+    }
+
     pub fn lcu_snapshot(&self) -> LcuSnapshot {
         let guard = self.lcu.lock().unwrap_or_else(PoisonError::into_inner);
         guard.clone()
@@ -159,6 +171,8 @@ impl AppState {
         self.set_session(None);
         self.set_roster(None);
         self.auto_accept.clear();
+        self.auto_select.clear();
+        crate::services::draft::on_phase(&self.app, gameflow::PHASE_NONE);
         self.update_lcu(|s| {
             *s = LcuSnapshot {
                 last_error,
