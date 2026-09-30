@@ -126,7 +126,12 @@ const lineup = computed(() => {
          squeezing icons. -->
     <div
       class="group/row flex cursor-pointer items-center gap-2 py-2 pr-3 transition-colors hover:bg-white/[0.025]"
+      role="button"
+      tabindex="0"
+      :aria-expanded="expanded"
       @click="expanded = !expanded"
+      @keydown.enter.self="expanded = !expanded"
+      @keydown.space.self.prevent="expanded = !expanded"
     >
       <div class="my-1 w-[3px] shrink-0 self-stretch rounded-r-full" :class="result.bar" />
 
