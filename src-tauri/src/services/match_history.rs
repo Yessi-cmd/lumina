@@ -276,7 +276,10 @@ impl MatchHistoryService {
     }
 
     fn request_lock(&self, req: &PageRequest) -> Arc<tokio::sync::Mutex<()>> {
-        let mut flights = self.in_flight.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut flights = self
+            .in_flight
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         flights.retain(|_, lock| lock.strong_count() > 0);
         if let Some(lock) = flights.get(req).and_then(Weak::upgrade) {
             return lock;

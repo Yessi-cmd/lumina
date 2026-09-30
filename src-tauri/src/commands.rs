@@ -111,7 +111,8 @@ pub async fn player_profile(
         position,
         champion_points,
     };
-    let profile = services::player_profile::load(&state.match_history, &session, &puuid, &ctx).await?;
+    let profile =
+        services::player_profile::load(&state.match_history, &session, &puuid, &ctx).await?;
     state.ensure_current_session(&session)?;
     Ok(profile)
 }
