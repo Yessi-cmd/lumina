@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { api } from "../api";
 import AppIcon from "../components/common/AppIcon.vue";
 import ToggleSwitch from "../components/common/ToggleSwitch.vue";
@@ -46,9 +46,15 @@ const PUSH_HINTS: Record<string, string> = {
   serverchan: "填 Server酱 Turbo 的 SendKey（sct.ftqq.com），消息会转发到微信。",
 };
 
-function onDelayInput(event: Event) {
-  const value = Number((event.target as HTMLInputElement).value);
-  store.update({ autoAcceptDelaySecs: value });
+// The slider label follows the thumb while dragging; the value is saved on release.
+const delayDraft = ref(0);
+watch(
+  () => s.value?.autoAcceptDelaySecs,
+  (secs) => (delayDraft.value = secs ?? 0),
+  { immediate: true },
+);
+function onDelayCommit() {
+  store.update({ autoAcceptDelaySecs: delayDraft.value });
 }
 </script>
 
@@ -82,14 +88,14 @@ function onDelayInput(event: Event) {
               step="1"
               class="flex-1 cursor-pointer accent-amber-500 disabled:cursor-not-allowed"
               :disabled="!s.autoAccept"
-              :value="s.autoAcceptDelaySecs"
-              :style="{ '--fill': `${s.autoAcceptDelaySecs * 10}%` }"
-              @change="onDelayInput"
+              v-model.number="delayDraft"
+              :style="{ '--fill': `${delayDraft * 10}%` }"
+              @change="onDelayCommit"
             />
             <span
               class="w-14 rounded-md bg-amber-400/10 py-0.5 text-center text-sm font-medium text-amber-200 tabular-nums ring-1 ring-amber-400/20 ring-inset"
             >
-              {{ s.autoAcceptDelaySecs }} 秒
+              {{ delayDraft }} 秒
             </span>
           </div>
 

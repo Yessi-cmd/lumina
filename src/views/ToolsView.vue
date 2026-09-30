@@ -18,6 +18,16 @@ function noteOf(err: unknown): Note {
   return { ok: false, text: String(err) };
 }
 
+/** Success notes fade after a few seconds; errors stay until the next action. */
+const NOTE_LIFETIME_MS = 4000;
+function flash(target: { value: Note | null }, text: string) {
+  const note: Note = { ok: true, text };
+  target.value = note;
+  setTimeout(() => {
+    if (target.value === note) target.value = null;
+  }, NOTE_LIFETIME_MS);
+}
+
 // --- Chat status ---------------------------------------------------------------------
 const AVAILABILITY = [
   { id: "chat", label: "在线" },
@@ -52,7 +62,7 @@ async function setAvailability(id: string) {
   try {
     await api.setChatAvailability(id);
     availability.value = id;
-    statusNote.value = { ok: true, text: "已切换。" };
+    flash(statusNote, "已切换。");
   } catch (err) {
     statusNote.value = noteOf(err);
   }
@@ -63,7 +73,7 @@ async function saveStatusMessage() {
   statusNote.value = null;
   try {
     await api.setChatStatusMessage(statusMessage.value);
-    statusNote.value = { ok: true, text: "签名已保存。" };
+    flash(statusNote, "签名已保存。");
   } catch (err) {
     statusNote.value = noteOf(err);
   } finally {
@@ -110,7 +120,7 @@ async function setBackground(skin: Skin) {
   try {
     await api.setProfileBackground(skin.id);
     backgroundId.value = skin.id;
-    backgroundNote.value = { ok: true, text: `生涯背景已设为「${skin.name}」。` };
+    flash(backgroundNote, `生涯背景已设为「${skin.name}」。`);
   } catch (err) {
     backgroundNote.value = noteOf(err);
   }
