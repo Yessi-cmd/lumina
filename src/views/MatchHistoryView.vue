@@ -54,6 +54,8 @@ const sgpError = ref<string | null>(null);
 const hasMore = ref(false);
 const loading = ref(false);
 const error = ref<string | null>(null);
+/** A name lookup is in flight (the game list has its own `loading`). */
+const searching = ref(false);
 // Guards against a slow response for a previous player overwriting the current one.
 let generation = 0;
 
@@ -173,10 +175,13 @@ async function search() {
   const text = query.value.trim();
   if (!text) return;
   error.value = null;
+  searching.value = true;
   try {
     await show(await api.lookupSummoner(text));
   } catch (err) {
     error.value = String(err);
+  } finally {
+    searching.value = false;
   }
 }
 
@@ -222,7 +227,9 @@ watch(
           />
           <input v-model="query" placeholder="名字#标签" class="field w-64 pl-9" />
         </div>
-        <button type="submit" :disabled="!lcu.connected" class="btn btn-primary">查询</button>
+        <button type="submit" :disabled="!lcu.connected || searching || !query.trim()" class="btn btn-primary">
+          {{ searching ? "查询中…" : "查询" }}
+        </button>
         <button
           type="button"
           :disabled="!lcu.snapshot.summoner"
@@ -236,6 +243,7 @@ watch(
     </header>
 
     <p v-if="!lcu.connected" class="empty-state">连接英雄联盟客户端后才能查询战绩。</p>
+    <p v-if="error" class="text-sm break-all text-red-400">{{ error }}</p>
 
     <div v-if="summoner" class="card overflow-hidden p-4">
       <div
@@ -394,8 +402,6 @@ watch(
         </template>
       </span>
     </div>
-
-    <p v-if="error" class="text-sm break-all text-red-400">{{ error }}</p>
 
     <TransitionGroup name="list" tag="div" class="flex flex-col gap-1.5">
       <MatchRow
