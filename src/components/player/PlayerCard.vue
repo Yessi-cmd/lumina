@@ -123,7 +123,10 @@ function openHistory() {
         ? 'animate-glow border-amber-400/40 bg-linear-to-r from-amber-500/[0.08] to-zinc-900/65 shadow-[0_0_0_1px_rgb(245_158_11/0.1),0_8px_24px_-14px_rgb(245_158_11/0.5)]'
         : 'border-white/[0.06] hover:border-white/[0.12]'
     "
+    role="link"
+    tabindex="0"
     @click="openHistory"
+    @keydown.enter.self="openHistory"
   >
     <div class="relative shrink-0">
       <img
@@ -143,7 +146,8 @@ function openHistory() {
 
     <div class="min-w-0 flex-1">
       <div class="flex items-baseline gap-2">
-        <span class="truncate font-medium text-zinc-100 select-text">{{ name }}</span>
+        <span v-if="summoner" class="truncate font-medium text-zinc-100 select-text">{{ name }}</span>
+        <span v-else class="skeleton h-4 w-28 rounded" />
         <span v-if="summoner" class="shrink-0 text-xs text-zinc-500">
           Lv.{{ summoner.summonerLevel }}
         </span>

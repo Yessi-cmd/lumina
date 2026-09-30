@@ -115,7 +115,12 @@ function whole(value: number | null): number {
       <span v-if="history" class="text-xs text-zinc-500">{{ history.name }}</span>
     </div>
 
-    <div v-if="loaded && !current" class="card p-6 text-sm text-zinc-400">
+    <div v-if="!loaded" class="flex flex-col gap-3">
+      <div class="skeleton h-32 rounded-2xl" />
+      <div class="skeleton h-56 rounded-2xl" />
+    </div>
+
+    <div v-else-if="!current && !error" class="card p-6 text-sm text-zinc-400">
       <p>这个队列还没有记录。</p>
       <p class="mt-1">
         Lumina 会在客户端连接时记下段位，之后每打完一局排位就记录一次胜点变化，从现在开始积累。
