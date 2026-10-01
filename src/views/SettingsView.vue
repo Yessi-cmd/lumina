@@ -348,6 +348,17 @@ function onDelayCommit() {
           </div>
         </div>
       </div>
+
+      <div>
+        <h2 class="eyebrow mb-2 px-1">关于</h2>
+        <div class="card flex items-center justify-between gap-6 p-4">
+          <div class="min-w-0">
+            <div class="font-medium text-zinc-100">作者 · 富强平等诚信</div>
+            <div class="mt-0.5 text-sm text-zinc-400">B站同名。欢迎在 GitHub 提 Issue 反馈问题和建议。</div>
+          </div>
+          <div class="shrink-0 select-text font-mono text-xs text-zinc-500">github.com/Yessi-cmd/lumina</div>
+        </div>
+      </div>
     </template>
   </section>
 </template>
