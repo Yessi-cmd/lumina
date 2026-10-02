@@ -45,7 +45,7 @@ async fn respond(app: &AppHandle, path: &str) -> Response<Vec<u8>> {
 }
 
 async fn load(app: &AppHandle, path: &str) -> Result<(Vec<u8>, String)> {
-    if !path.starts_with(ALLOWED_PREFIX) || path.contains("..") {
+    if !allowed_path(path) {
         return Err(AppError::Message(format!("不允许的资源路径: {path}")));
     }
 
@@ -62,6 +62,22 @@ async fn load(app: &AppHandle, path: &str) -> Result<(Vec<u8>, String)> {
     let fallback = content_type_for(path);
     let content_type = content_type.unwrap_or_else(|| fallback.to_owned());
     Ok((body, content_type))
+}
+
+// Game-data asset paths are ASCII. Reject encodings and URL delimiters before
+// reqwest can normalize them; neither single nor double decoding may escape.
+fn allowed_path(path: &str) -> bool {
+    let Some(relative) = path.strip_prefix(ALLOWED_PREFIX) else {
+        return false;
+    };
+    relative.split('/').all(|segment| {
+        !segment.is_empty()
+            && segment != "."
+            && segment != ".."
+            && segment
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'.' | b'-' | b'_'))
+    })
 }
 
 fn cache_path(app: &AppHandle, path: &str) -> PathBuf {
@@ -101,6 +117,30 @@ fn content_type_for(path: &str) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rejects_paths_that_could_escape_the_asset_namespace() {
+        for relative in [
+            "",
+            "../token",
+            "%2e%2e/token",
+            "%2E./token",
+            "%252e%252e/token",
+            "v1\\..\\token",
+            "v1/%2f/token",
+            "v1//icon.png",
+            "./icon.png",
+            "icon.png?x=1",
+            "icon.png#fragment",
+        ] {
+            assert!(!allowed_path(&format!("{ALLOWED_PREFIX}{relative}")));
+        }
+        assert!(!allowed_path("/entitlements/v1/token"));
+        assert!(allowed_path("/lol-game-data/assets/v1/champion-icons/1.png"));
+        assert!(allowed_path(
+            "/lol-game-data/assets/ASSETS/Items/Icons2D/1001_Boots.png"
+        ));
+    }
 
     #[test]
     fn sanitizes_cache_names() {

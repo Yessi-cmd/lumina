@@ -91,8 +91,26 @@ async fn send(settings: &Settings, title: &str, body: &str) -> Result<()> {
         }
         _ => return Err(AppError::Message("没有选择推送渠道".to_owned())),
     };
-    request.send().await?.error_for_status()?;
+    request
+        .send()
+        .await
+        .map_err(push_error)?
+        .error_for_status()
+        .map_err(push_error)?;
     Ok(())
+}
+
+// Do not retain the error chain: URLs (including device keys) can also occur in
+// nested transport errors. Only expose a fixed category and the HTTP status.
+fn push_error(err: reqwest::Error) -> AppError {
+    let message = if let Some(status) = err.status() {
+        format!("推送服务返回 HTTP {}", status.as_u16())
+    } else if err.is_timeout() {
+        "推送请求超时".to_owned()
+    } else {
+        "推送请求失败，请检查网络和推送配置".to_owned()
+    };
+    AppError::Message(message)
 }
 
 /// Server酱 keys go into the URL path, so anything but letters, digits and `-_` is a typo.
@@ -131,6 +149,35 @@ fn bad_address() -> AppError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn request_errors_do_not_expose_keys() {
+        let err = reqwest::Client::new()
+            .get("unsupported://example.com/private-device-key/message")
+            .send()
+            .await
+            .unwrap_err();
+        let error = push_error(err);
+        assert!(!error.to_string().contains("private-device-key"));
+        assert!(!format!("{error:?}").contains("private-device-key"));
+    }
+
+    #[test]
+    fn status_errors_do_not_expose_keys() {
+        let response: reqwest::Response = tauri::http::Response::builder()
+            .status(401)
+            .body("")
+            .unwrap()
+            .into();
+        let err = response.error_for_status().unwrap_err().with_url(
+            reqwest::Url::parse("https://api.day.app/private-device-key/message").unwrap(),
+        );
+        let error = push_error(err);
+        assert_eq!(error.to_string(), "推送服务返回 HTTP 401");
+        assert!(!serde_json::to_string(&error)
+            .unwrap()
+            .contains("private-device-key"));
+    }
 
     #[test]
     fn bark_message_is_percent_encoded_into_the_path() {

@@ -9,7 +9,9 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Emitter};
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+mod staging;
 
 use crate::error::{AppError, Result};
 
@@ -23,6 +25,7 @@ pub const PROGRESS_EVENT: &str = "update://progress";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 /// Downloads have no overall limit, only a stall limit.
 const READ_TIMEOUT: Duration = Duration::from_secs(30);
+const MAX_INSTALLER_BYTES: u64 = 256 * 1024 * 1024;
 const USER_AGENT: &str = concat!("Lumina/", env!("CARGO_PKG_VERSION"));
 
 #[derive(Debug, Clone, Serialize)]
@@ -86,7 +89,9 @@ pub async fn check() -> Result<UpdateInfo> {
         current: current.to_owned(),
         latest: release.version().to_owned(),
         available,
-        installable: available && installed() && release.installer().is_some(),
+        installable: available
+            && installed()
+            && release.installer().is_some_and(|a| expected_digest(a).is_ok()),
         url: release.html_url,
         notes: release.body,
     })
@@ -109,17 +114,25 @@ pub async fn install(app: &AppHandle) -> Result<()> {
         let url = &asset.browser_download_url;
         return Err(AppError::Message(format!("不允许的下载地址: {url}")));
     }
-
-    let dir = std::env::temp_dir().join("lumina-update");
-    tokio::fs::create_dir_all(&dir).await?;
-    let path = dir.join(&asset.name);
+    let expected = expected_digest(asset)?;
+    if asset.size == 0 || asset.size > MAX_INSTALLER_BYTES {
+        return Err(AppError::Message("安装包大小不合法".to_owned()));
+    }
+    let staging = staging::Staging::new()?;
+    let path = staging.path();
     download(app, asset, &path).await?;
+    // The directory denies unelevated writes. Keep a read-only file handle that
+    // denies writes/deletion from disk verification through CreateProcess.
+    let mut verified = tokio::fs::File::from_std(staging.open_verified()?);
+    verify_file(&mut verified, asset.size, expected).await?;
 
     log::info!("starting installer {}", path.display());
     // Passive: progress only, no questions; /R starts Lumina again afterwards.
     std::process::Command::new(&path)
         .args(["/P", "/R"])
         .spawn()?;
+    // NSIS may still need its on-disk executable while it starts up.
+    staging.keep();
     app.exit(0);
     Ok(())
 }
@@ -161,29 +174,55 @@ async fn download(app: &AppHandle, asset: &GithubAsset, path: &Path) -> Result<(
         .error_for_status()?;
 
     let total = asset.size;
-    let mut file = tokio::fs::File::create(path).await?;
-    let mut hasher = Sha256::new();
+    let mut file = tokio::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .await?;
     let mut downloaded = 0u64;
     while let Some(chunk) = response.chunk().await? {
+        if chunk.len() as u64 > total.saturating_sub(downloaded) {
+            return Err(AppError::Message("安装包超过声明大小".to_owned()));
+        }
         file.write_all(&chunk).await?;
-        hasher.update(&chunk);
         downloaded += chunk.len() as u64;
         let _ = app.emit(PROGRESS_EVENT, Progress { downloaded, total });
     }
     file.flush().await?;
-    drop(file);
 
     if downloaded != total {
         let message = format!("安装包不完整（{downloaded}/{total} 字节）");
         return Err(AppError::Message(message));
     }
-    let expected = asset.digest.as_deref();
-    if let Some(expected) = expected.and_then(|d| d.strip_prefix("sha256:")) {
-        let actual = hex(&hasher.finalize());
-        if !actual.eq_ignore_ascii_case(expected) {
-            let _ = tokio::fs::remove_file(path).await;
-            return Err(AppError::Message("安装包校验失败，请重试".to_owned()));
+    Ok(())
+}
+
+fn expected_digest(asset: &GithubAsset) -> Result<&str> {
+    asset
+        .digest
+        .as_deref()
+        .and_then(|value| value.strip_prefix("sha256:"))
+        .filter(|value| value.len() == 64 && value.bytes().all(|c| c.is_ascii_hexdigit()))
+        .ok_or_else(|| AppError::Message("安装包缺少有效校验信息，请到发布页下载".to_owned()))
+}
+
+async fn verify_file(file: &mut tokio::fs::File, size: u64, expected: &str) -> Result<()> {
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    let mut read = 0u64;
+    loop {
+        let count = file.read(&mut buffer).await?;
+        if count == 0 {
+            break;
         }
+        read += count as u64;
+        if read > size {
+            return Err(AppError::Message("安装包大小校验失败".to_owned()));
+        }
+        hasher.update(&buffer[..count]);
+    }
+    if read != size || !hex(&hasher.finalize()).eq_ignore_ascii_case(expected) {
+        return Err(AppError::Message("安装包校验失败，请重试".to_owned()));
     }
     Ok(())
 }
@@ -224,6 +263,24 @@ fn parse(version: &str) -> Option<(u64, u64, u64)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn requires_a_complete_sha256_digest() {
+        let mut asset = GithubAsset {
+            name: "installer-setup.exe".to_owned(),
+            browser_download_url: String::new(),
+            size: 1,
+            digest: None,
+        };
+        for digest in [None, Some("sha256:ab"), Some("sha512:abcd")] {
+            asset.digest = digest.map(str::to_owned);
+            assert!(expected_digest(&asset).is_err());
+        }
+        asset.digest = Some(format!("sha256:{}", "g".repeat(64)));
+        assert!(expected_digest(&asset).is_err());
+        asset.digest = Some(format!("sha256:{}", "a".repeat(64)));
+        assert!(expected_digest(&asset).is_ok());
+    }
 
     #[test]
     fn compares_versions_numerically() {
