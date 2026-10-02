@@ -91,7 +91,9 @@ pub async fn check() -> Result<UpdateInfo> {
         available,
         installable: available
             && installed()
-            && release.installer().is_some_and(|a| expected_digest(a).is_ok()),
+            && release
+                .installer()
+                .is_some_and(|a| expected_digest(a).is_ok()),
         url: release.html_url,
         notes: release.body,
     })

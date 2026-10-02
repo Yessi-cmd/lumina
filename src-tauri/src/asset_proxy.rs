@@ -136,7 +136,9 @@ mod tests {
             assert!(!allowed_path(&format!("{ALLOWED_PREFIX}{relative}")));
         }
         assert!(!allowed_path("/entitlements/v1/token"));
-        assert!(allowed_path("/lol-game-data/assets/v1/champion-icons/1.png"));
+        assert!(allowed_path(
+            "/lol-game-data/assets/v1/champion-icons/1.png"
+        ));
         assert!(allowed_path(
             "/lol-game-data/assets/ASSETS/Items/Icons2D/1001_Boots.png"
         ));
