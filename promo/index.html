@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>Lumina Promo</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;background:#0b0d12;overflow:hidden;font-family:"Segoe UI Variable Text","Segoe UI","Microsoft YaHei UI","PingFang SC",sans-serif;color:#eceef2}
+#stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:radial-gradient(ellipse at 50% 120%,#161a24,#0b0d12 60%)}
+.blob{position:absolute;border-radius:50%;filter:blur(120px)}
+.scene{position:absolute;inset:0;opacity:0}
+.title{position:absolute;left:140px;top:110px;font-size:30px;letter-spacing:6px;color:#f59e0b;font-weight:600}
+.head{position:absolute;left:140px;top:160px;font-size:76px;font-weight:700;letter-spacing:2px}
+.head em{font-style:normal;color:#f59e0b}
+.panel{background:#14171e;border:1px solid #2a2f3a;border-radius:20px}
+.card{position:absolute;width:300px;height:220px;padding:22px;opacity:0}
+.card .n{font-size:28px;font-weight:600}.card .r{font-size:20px;color:#969dab;margin-top:4px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.chip{font-size:20px;padding:5px 12px;border-radius:999px;opacity:0;white-space:nowrap}
+.bad{background:#3a1d22;color:#fb7185}.good{background:#3a2c10;color:#fbbf24}.neu{background:#1f2a3d;color:#7dd3fc}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:10px}
+.row{position:absolute;left:260px;width:1400px;height:150px;padding:0 40px;display:flex;align-items:center;opacity:0}
+.lane{width:110px;font-size:34px;font-weight:700;color:#c1c6d0}
+.bars{flex:1;position:relative;height:60px}
+.bar{position:absolute;height:24px;border-radius:12px;top:0}
+.num{position:absolute;font-size:22px;font-weight:600;top:-2px}
+.verdict{width:420px;text-align:right;font-size:34px;font-weight:700}
+.tog{position:absolute;left:140px;width:860px;height:150px;padding:0 44px;display:flex;align-items:center;justify-content:space-between;font-size:42px;font-weight:600;opacity:0}
+.sw{width:100px;height:56px;border-radius:28px;background:#2a2f3a;position:relative}
+.sw i{position:absolute;top:6px;left:6px;width:44px;height:44px;border-radius:50%;background:#969dab}
+.phone{position:absolute;left:1180px;top:240px;width:560px;height:640px;border-radius:56px;border:3px solid #2a2f3a;background:#0f1218;opacity:0}
+.push{position:absolute;left:30px;right:30px;top:120px;padding:26px 28px;border-radius:24px;background:#1d2129;opacity:0}
+.push b{display:block;font-size:30px;margin-bottom:8px;color:#fbbf24}.push span{font-size:26px;color:#c1c6d0}
+.chart{position:absolute;left:140px;top:330px;width:1640px;height:560px}
+.logo{position:absolute;left:0;right:0;text-align:center;font-size:190px;font-weight:800;letter-spacing:10px;background:linear-gradient(180deg,#fde68a,#f59e0b);-webkit-background-clip:text;color:transparent}
+.sub{position:absolute;left:0;right:0;text-align:center;font-size:44px;color:#c1c6d0;letter-spacing:4px}
+</style></head><body>
+<div id="stage">
+  <div class="blob" id="b1" style="width:800px;height:800px;background:#f59e0b33;left:-200px;top:-200px"></div>
+  <div class="blob" id="b2" style="width:900px;height:900px;background:#3b82f633;right:-300px;bottom:-300px"></div>
+
+  <div class="scene" id="s1"><div class="logo" id="l1" style="top:320px">Lumina</div>
+    <div class="sub" id="l1s" style="top:590px">轻量、高性能的英雄联盟桌面助手</div></div>
+
+  <div class="scene" id="s2"><div class="title">对局面板</div><div class="head">选人加载，<em>十人底细</em>一眼看穿</div><div id="cards"></div></div>
+
+  <div class="scene" id="s3"><div class="title">田忌赛马</div><div class="head">战力对位，<em>针对建议</em>直接给出</div><div id="rows"></div></div>
+
+  <div class="scene" id="s4"><div class="title">自动化</div><div class="head">省下的每一次点击，<em>都是专注</em></div>
+    <div id="togs"></div>
+    <div class="phone" id="phone"><div class="push" id="push"><b>Lumina · 对局已找到</b><span>排位赛 · 单双排，请回到客户端</span></div></div></div>
+
+  <div class="scene" id="s5"><div class="title">段位记录</div><div class="head">每一局胜点，<em>画成走势</em></div>
+    <svg class="chart" viewBox="0 0 1640 560">
+      <g stroke="#2a2f3a" stroke-width="2"><line x1="0" y1="540" x2="1640" y2="540"/><line x1="0" y1="360" x2="1640" y2="360"/><line x1="0" y1="180" x2="1640" y2="180"/></g>
+      <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f59e0b" stop-opacity=".35"/><stop offset="1" stop-color="#f59e0b" stop-opacity="0"/></linearGradient></defs>
+      <path id="area" fill="url(#g)"/><path id="line" fill="none" stroke="#f59e0b" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle id="dotc" r="14" fill="#fde68a"/>
+    </svg></div>
+
+  <div class="scene" id="s6"><div class="logo" id="l6" style="top:300px">Lumina</div>
+    <div class="sub" id="l6a" style="top:560px;color:#eceef2">不读游戏内存 · 不注入进程</div>
+    <div class="sub" id="l6b" style="top:640px;font-size:34px;color:#969dab">开源 · MIT · 免费使用</div></div>
+</div>
+<script>
+const E=t=>1-Math.pow(1-t,4), cl=x=>Math.max(0,Math.min(1,x)), pr=(t,s,d)=>E(cl((t-s)/d));
+const S=[[0,3.2],[3,7.2],[7,11.2],[11,15.2],[15,18.2],[18,20]];
+const $=id=>document.getElementById(id);
+function tf(el,o,y,s,x){y=y||0;s=s==null?1:s;x=x||0;el.style.opacity=o;el.style.transform='translate('+x+'px,'+y+'px) scale('+s+')'}
+
+const P=[["夜行者","白银 II",[["三连败","bad"],["练英雄","neu"]]],["风语","黄金 IV",[["绝活 · 亚索","good"],["单杀多","good"]]],["小熊软糖","白银 I",[["闪现异位","bad"]]],["Moonlit","铂金 III",[["开黑推断","neu"],["连胜 5","good"]]],["阿杰","黄金 II",[["近期异常","bad"],["遇见过","neu"]]]];
+const Q=[["Rainfall","钻石 IV",[["连胜 7","good"],["输出第一","good"]]],["老王","黄金 I",[["补刀弱","bad"]]],["Kiyo","铂金 II",[["绝活 · 劫","good"]]],["一只小猫","白银 III",[["练英雄","neu"],["连败 4","bad"]]],["Zed丶","黄金 III",[["闪现异位","bad"],["遇见过","neu"]]]];
+P.concat(Q).forEach(function(p,i){var d=document.createElement('div');d.className='card panel';var col=i%5,row=i<5?0:1;
+ d.style.left=(140+col*340)+'px';d.style.top=(380+row*270)+'px';
+ d.innerHTML='<div class="n"><span class="dot" style="background:'+(row?'#fb7185':'#60a5fa')+'"></span>'+p[0]+'</div><div class="r">'+p[1]+'</div><div class="chips">'+p[2].map(function(c){return '<span class="chip '+c[1]+'">'+c[0]+'</span>'}).join('')+'</div>';
+ $('cards').appendChild(d)});
+
+const R=[["上路",78,52,"上等马 · 可压制","#fbbf24"],["打野",61,70,"下等马 · 保下路","#fb7185"],["中路",83,66,"硬骨头 · 好抓","#7dd3fc"]];
+R.forEach(function(r,i){var d=document.createElement('div');d.className='row panel';d.style.top=(400+i*190)+'px';
+ d.innerHTML='<div class="lane">'+r[0]+'</div><div class="bars"><div class="bar" style="background:#60a5fa;width:0"></div><div class="bar" style="background:#fb7185;top:34px;width:0"></div><div class="num" style="color:#60a5fa">0</div><div class="num" style="top:32px;color:#fb7185">0</div></div><div class="verdict" style="color:'+r[4]+';opacity:0">'+r[3]+'</div>';
+ $('rows').appendChild(d)});
+
+const T=["自动接受对局","自动 BP · 分路预设","自动荣誉点赞"];
+T.forEach(function(x,i){var d=document.createElement('div');d.className='tog panel';d.style.top=(380+i*200)+'px';
+ d.innerHTML='<span>'+x+'</span><div class="sw"><i></i></div>';$('togs').appendChild(d)});
+
+const pts=[40,70,60,130,110,190,170,150,260,240,330,300,390,370,470];
+const xs=pts.map(function(_,i){return i*(1640/(pts.length-1))}), ys=pts.map(function(v){return 540-v});
+const lineD=xs.map(function(x,i){return (i?'L':'M')+x.toFixed(1)+' '+ys[i]}).join(' ');
+$('line').setAttribute('d',lineD);
+$('area').setAttribute('d',lineD+' L1640 540 L0 540 Z');
+const LL=$('line').getTotalLength();
+
+function render(t){
+ tf($('b1'),1,0,1,Math.sin(t/3)*60); tf($('b2'),1,0,1,Math.cos(t/4)*-60);
+ S.forEach(function(s,i){var o=Math.min(cl((t-s[0])/0.4),i==5?1:cl((s[1]-t)/0.4));$('s'+(i+1)).style.opacity=o});
+ var l=t, p;
+ p=pr(l,0.1,1.2);tf($('l1'),p,(1-p)*40,0.92+0.08*pr(l,0.1,1.5));$('l1').style.filter='drop-shadow(0 0 '+(30+20*Math.sin(t*2))+'px #f59e0b66)';
+ p=pr(l,1.2,0.9);tf($('l1s'),p,(1-p)*24);
+
+ l=t-3; document.querySelectorAll('#cards .card').forEach(function(c,i){var p=pr(l,0.4+i*0.08,0.6);tf(c,p,(1-p)*50);
+  c.querySelectorAll('.chip').forEach(function(ch,j){var q=pr(l,1.3+i*0.1+j*0.2,0.45);tf(ch,q,0,0.7+0.3*q)})});
+
+ l=t-7; document.querySelectorAll('#rows .row').forEach(function(r,i){var s=0.4+i*0.35,p=pr(l,s,0.6);tf(r,p,(1-p)*40);
+  var b=r.querySelectorAll('.bar'),n=r.querySelectorAll('.num'),g=pr(l,s+0.3,1.1),W=r.querySelector('.bars').clientWidth-90;
+  b[0].style.width=(R[i][1]/100*W*g)+'px';b[1].style.width=(R[i][2]/100*W*g)+'px';
+  n[0].style.left=(R[i][1]/100*W*g+14)+'px';n[1].style.left=(R[i][2]/100*W*g+14)+'px';
+  n[0].textContent=Math.round(R[i][1]*g);n[1].textContent=Math.round(R[i][2]*g);
+  var v=pr(l,s+1.3,0.5);tf(r.querySelector('.verdict'),v,0,0.85+0.15*v)});
+
+ l=t-11; document.querySelectorAll('#togs .tog').forEach(function(d,i){var p=pr(l,0.4+i*0.3,0.6);tf(d,p,(1-p)*40);
+  var on=pr(l,1.0+i*0.35,0.3),sw=d.querySelector('.sw'),k=sw.firstChild;
+  sw.style.background='color-mix(in srgb,#f59e0b '+(on*100)+'%,#2a2f3a)';k.style.transform='translateX('+(on*44)+'px)';k.style.background=on>.5?'#fff':'#969dab'});
+ p=pr(l,0.8,0.8);tf($('phone'),p,(1-p)*60);p=pr(l,2.0,0.6);tf($('push'),p,(1-p)*-40);
+
+ l=t-15; var g=pr(l,0.6,2);
+ var ln=$('line');ln.style.strokeDasharray=LL;ln.style.strokeDashoffset=LL*(1-g);
+ var pt=ln.getPointAtLength(LL*g);
+ $('area').style.clipPath='inset(0 '+((1-pt.x/1640)*100)+'% 0 0)';
+ $('dotc').setAttribute('cx',pt.x);$('dotc').setAttribute('cy',pt.y);$('dotc').style.opacity=g>0?1:0;
+
+ l=t-18; p=pr(l,0,0.9);tf($('l6'),p,(1-p)*30,0.94+0.06*pr(l,0,1.2));$('l6').style.filter='drop-shadow(0 0 40px #f59e0b66)';
+ p=pr(l,0.5,0.7);tf($('l6a'),p,(1-p)*20);p=pr(l,0.9,0.7);tf($('l6b'),p,(1-p)*20);
+}
+window.render=render;
+if(!location.hash.includes('manual')){var t0=performance.now();(function f(){render(((performance.now()-t0)/1000)%20);requestAnimationFrame(f)})()}
+</script></body></html>
