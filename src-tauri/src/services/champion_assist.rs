@@ -172,7 +172,7 @@ impl ChampionAssist {
         Ok(entries)
     }
 
-    async fn lane_entries(&self, position: &str, tier: &str) -> Result<Vec<TierEntry>> {
+    pub(super) async fn lane_entries(&self, position: &str, tier: &str) -> Result<Vec<TierEntry>> {
         let lane = lane(position)?;
         let key = format!("{lane}:{tier}");
         if let Some(entries) = cached(&self.tier_lists, &key) {

@@ -9,6 +9,7 @@ import {
   type Verdict,
 } from "../../api";
 import { useGameDataStore } from "../../stores/gameData";
+import PersonalRecommendations from "./PersonalRecommendations.vue";
 
 const props = defineProps<{
   /** Assigned position (TOP / JUNGLE / MIDDLE / BOTTOM / UTILITY); empty outside role queues. */
@@ -217,6 +218,13 @@ async function apply() {
         </button>
       </div>
     </div>
+
+    <PersonalRecommendations
+      :position="lane"
+      :opponent-id="pinnedOpponent"
+      @select="selected = $event"
+      @opponent="pinOpponent"
+    />
 
     <!-- Build of the selected champion -->
     <div v-if="selected > 0" class="rounded-lg border border-white/[0.05] bg-zinc-950/50 p-3">

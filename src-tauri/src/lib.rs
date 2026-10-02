@@ -50,6 +50,7 @@ pub fn run() {
             commands::log_frontend,
             commands::game_detail,
             commands::champion_tier_list,
+            commands::personal_recommendations,
             commands::champion_build,
             commands::apply_build,
             commands::champion_matchups,

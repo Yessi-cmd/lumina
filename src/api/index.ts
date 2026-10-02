@@ -191,6 +191,26 @@ export interface Career {
   trend: { result: GameResult; kda: number; createdAt: number }[];
 }
 
+export type PoolPreference = "familiar" | "practice" | "excluded";
+export interface PoolEntry {
+  championId: number;
+  preference: PoolPreference;
+}
+export interface PersonalCandidate {
+  championId: number;
+  label: string;
+  games: number;
+  wins: number;
+  reasons: string[];
+  matchups: Matchup[];
+}
+export interface RecommendationReport {
+  candidates: PersonalCandidate[];
+  warnings: string[];
+  sampleGames: number;
+  queueId: number;
+}
+
 export interface TierEntry {
   championId: number;
   rank: number;
@@ -448,6 +468,7 @@ export interface RosterInsights {
 }
 
 export interface Settings {
+  championPools: Record<string, Record<string, PoolEntry[]>>;
   autoAccept: boolean;
   /** 0–10 seconds before accepting, leaving time to decline by hand. */
   autoAcceptDelaySecs: number;
@@ -641,6 +662,8 @@ export const api = {
   gameDetail: (gameId: number) => invoke<GameDetail>("game_detail", { gameId }),
   gameBuilds: (gameId: number) => invoke<PlayerBuild[]>("game_builds", { gameId }),
   championTierList: (position: string) => invoke<TierEntry[]>("champion_tier_list", { position }),
+  personalRecommendations: (position: string, opponentId: number) =>
+    invoke<RecommendationReport>("personal_recommendations", { position, opponentId }),
   championBuild: (championId: number, position: string) =>
     invoke<ChampionBuild>("champion_build", { championId, position }),
   championMatchups: (championId: number, position: string, enemies: number[]) =>

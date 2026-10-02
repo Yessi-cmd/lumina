@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import type { AutoSelect, Preset } from "../api";
 import ChampionPicker from "../components/champion/ChampionPicker.vue";
+import ChampionPoolEditor from "../components/champion/ChampionPoolEditor.vue";
 import ToggleSwitch from "../components/common/ToggleSwitch.vue";
 import { useGameDataStore } from "../stores/gameData";
 import { useSettingsStore } from "../stores/settings";
@@ -151,6 +152,11 @@ function onDelayInput(event: Event) {
         <p class="mb-3 px-1 text-xs text-zinc-500">
           分路以客户端分配的位置为准。该分路的预设用完（都被禁、被选或没有）后，再用「通用」里的预设；位置不明时（如匹配模式）只用「通用」。
         </p>
+
+        <div v-if="position !== 'ANY'" class="mb-4">
+          <ChampionPoolEditor :position="position" />
+          <p class="mt-2 px-1 text-xs text-zinc-500">英雄池用于个人推荐；自动禁选仍按下面的预设执行。</p>
+        </div>
 
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div v-for="list in LISTS" :key="list.kind" class="card flex flex-col gap-3 p-4">

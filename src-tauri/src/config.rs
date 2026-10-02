@@ -27,6 +27,24 @@ const MAX_SELECT_DELAY_SECS: u32 = 10;
 /// Phone push channels: Bark (iOS) and Server酱 (WeChat).
 pub const PUSH_PROVIDERS: [&str; 3] = ["off", "bark", "serverchan"];
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PoolPreference {
+    Familiar,
+    Practice,
+    Excluded,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PoolEntry {
+    pub champion_id: i64,
+    pub preference: PoolPreference,
+}
+
+/// Account (platform + PUUID) -> position -> explicit personal preferences.
+pub type ChampionPools = HashMap<String, HashMap<String, Vec<PoolEntry>>>;
+
 /// Champions to ban and pick for one position, best first.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -81,6 +99,7 @@ fn clean_ids(ids: &mut Vec<i64>) {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {
+    pub champion_pools: ChampionPools,
     pub auto_accept: bool,
     /// Seconds to wait before accepting, leaving time to decline by hand.
     pub auto_accept_delay_secs: u32,
@@ -112,6 +131,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            champion_pools: HashMap::new(),
             auto_accept: false,
             auto_accept_delay_secs: 2,
             auto_show_panel: true,
@@ -163,6 +183,14 @@ impl Settings {
     }
 
     pub fn normalized(mut self) -> Self {
+        for positions in self.champion_pools.values_mut() {
+            positions.retain(|position, _| PRESET_POSITIONS[..5].contains(&position.as_str()));
+            for entries in positions.values_mut() {
+                let mut seen = HashSet::new();
+                entries.retain(|entry| entry.champion_id > 0 && seen.insert(entry.champion_id));
+                entries.truncate(30);
+            }
+        }
         self.auto_accept_delay_secs = self.auto_accept_delay_secs.min(MAX_ACCEPT_DELAY_SECS);
         if !STATS_TIERS.contains(&self.stats_tier.as_str()) {
             self.stats_tier = DEFAULT_STATS_TIER.to_owned();
@@ -203,6 +231,34 @@ mod tests {
         assert_eq!(s.auto_accept_delay_secs, MAX_ACCEPT_DELAY_SECS);
         assert_eq!(s.tilt_streak, 3);
         assert_eq!(s.push_provider, "off");
+        assert!(s.champion_pools.is_empty());
+    }
+
+    #[test]
+    fn personal_pools_keep_accounts_separate_and_validate_positions() {
+        let settings: Settings = serde_json::from_value(serde_json::json!({
+            "championPools": {
+                "HN1:alice": {"MIDDLE": [
+                    {"championId": 1, "preference": "familiar"},
+                    {"championId": 1, "preference": "excluded"},
+                    {"championId": -1, "preference": "practice"}
+                ], "ANY": [{"championId": 2, "preference": "familiar"}]},
+                "HN1:bob": {"MIDDLE": [{"championId": 1, "preference": "excluded"}]}
+            }
+        }))
+        .unwrap();
+        let settings = settings.normalized();
+        let alice = &settings.champion_pools["HN1:alice"];
+        assert_eq!(alice.len(), 1);
+        assert_eq!(alice["MIDDLE"].len(), 1);
+        assert_eq!(alice["MIDDLE"][0].preference, PoolPreference::Familiar);
+        assert_eq!(
+            settings.champion_pools["HN1:bob"]["MIDDLE"][0].preference,
+            PoolPreference::Excluded
+        );
+        let restored: Settings =
+            serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
+        assert_eq!(restored.champion_pools, settings.champion_pools);
     }
 
     #[test]

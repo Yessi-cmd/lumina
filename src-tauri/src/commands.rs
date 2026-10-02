@@ -305,6 +305,16 @@ pub async fn game_detail(state: State<'_, AppState>, game_id: i64) -> Result<Gam
     Ok(detail)
 }
 
+/// Personal recommendations from the current account's pool and champ-select state.
+#[tauri::command]
+pub async fn personal_recommendations(
+    state: State<'_, AppState>,
+    position: String,
+    opponent_id: i64,
+) -> Result<services::personal_draft::RecommendationReport> {
+    services::personal_draft::recommend(&state, &position, opponent_id).await
+}
+
 /// Champions ranked for a position, from lolalytics at the configured rank filter.
 #[tauri::command]
 pub async fn champion_tier_list(

@@ -16,6 +16,7 @@ pub mod matchup;
 pub mod ongoing_game;
 pub mod overlay_window;
 pub mod panel_window;
+pub mod personal_draft;
 pub mod player_profile;
 pub mod push;
 pub mod rank_history;
