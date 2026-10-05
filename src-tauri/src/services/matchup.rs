@@ -7,7 +7,8 @@
 //! their usual position (补位 costs power). Players are then ranked within their own team
 //! (上等马 / 下等马), opponents are called out as 硬骨头 / 软柿子, same-position players
 //! are compared lane by lane, and early deaths to the enemy jungler mark players as easy
-//! or hard to gank.
+//! or hard to gank. Players with an outstanding recent ranked record are 小代; in champ
+//! select, a 小代 teammate placed off their positions is suggested a swap with you.
 
 use std::collections::HashMap;
 
@@ -15,7 +16,7 @@ use serde::Serialize;
 
 use super::player_profile::{PlayerProfile, PlayerTag, RankedForm, Tone};
 use super::timeline::EarlyStats;
-use crate::state::ongoing::{Roster, RosterPlayer};
+use crate::state::ongoing::{Roster, RosterPlayer, RosterStage};
 
 /// Every threshold in one place.
 mod limits {
@@ -54,6 +55,14 @@ mod limits {
     pub const GANK_MIN_GAMES: usize = 4;
     pub const STRONG_LANE_GOLD: f64 = 350.0;
     pub const LANE_TAG_MIN_GAMES: usize = 4;
+    /// 小代: enough recent ranked games, won this often, and played this far above the
+    /// average player on the same position (performance is -1..1).
+    pub const CARRY_MIN_GAMES: usize = 8;
+    pub const CARRY_WIN_RATE: f64 = 0.65;
+    pub const CARRY_PERFORMANCE: f64 = 0.3;
+    /// A position with this share of a player's positioned ranked games is one they are
+    /// comfortable on.
+    pub const COMFORT_SHARE: f64 = 0.25;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -154,9 +163,14 @@ pub fn analyze(
     for seat in &seats {
         let mut tags = gank_and_lane_tags(seat);
         tags.extend(position_tag(seat));
+        tags.extend(carry_tag(seat));
         for tag in tags {
             matchup.add_tag(&seat.player.puuid, tag);
         }
+    }
+    // Positions can only be traded before the game starts.
+    if roster.stage == RosterStage::ChampSelect {
+        matchup.suggest_swaps(&seats);
     }
     let enemies_known = !roster.enemies.is_empty();
     for ally in [true, false] {
@@ -242,6 +256,39 @@ impl Matchup {
                 let detail = format!("{detail}这一路以稳为主，别把资源送进去。");
                 self.advise(Tone::Warning, &seat.player.puuid, "敌方硬骨头", detail);
             }
+        }
+    }
+
+    /// A 小代 teammate assigned a position they rarely play, while you hold one they are
+    /// comfortable on: trading positions lets them carry from where they play best.
+    fn suggest_swaps(&mut self, seats: &[Seat]) {
+        let Some(me) = seats.iter().find(|s| s.ally && s.player.is_self) else {
+            return;
+        };
+        let mine = me.player.position.as_str();
+        if mine.is_empty() {
+            return;
+        }
+        for seat in seats.iter().filter(|s| s.ally && !s.player.is_self) {
+            let Some(form) = seat.form.filter(|f| is_carry(f)) else {
+                continue;
+            };
+            let theirs = seat.player.position.as_str();
+            let n = form.positioned_games;
+            if theirs.is_empty() || theirs == mine || n < limits::OFF_ROLE_MIN_GAMES {
+                continue;
+            }
+            if comfortable(form, theirs) || !comfortable(form, mine) {
+                continue;
+            }
+            let (usual, played) = (comfortable_positions(form), games_on(form, theirs));
+            let (assigned, here) = (position_name(theirs), position_name(mine));
+            let mut detail = format!("小代常玩{usual}，本局被分到{assigned}");
+            detail.push_str(&format!("（近 {n} 场排位只打过 {played} 场）。"));
+            detail.push_str(&format!("你在{here}，正好是对方的舒适位置，"));
+            detail.push_str("可以在选人阶段和对方换位置，让小代打熟悉的位置带你赢。");
+            let title = format!("和小代换位 · {here}");
+            self.advise(Tone::Positive, &seat.player.puuid, &title, detail);
         }
     }
 
@@ -431,6 +478,59 @@ fn gank_and_lane_tags(seat: &Seat) -> Vec<PlayerTag> {
     tags
 }
 
+/// Recent ranked games well above the average player on the same position, and mostly won.
+fn is_carry(form: &RankedForm) -> bool {
+    let Some(performance) = form.performance else {
+        return false;
+    };
+    let rate = form.won_games as f64 / form.games.max(1) as f64;
+    form.games >= limits::CARRY_MIN_GAMES
+        && rate >= limits::CARRY_WIN_RATE
+        && performance >= limits::CARRY_PERFORMANCE
+}
+
+/// 小代: a teammate to play around, or an opponent to respect.
+fn carry_tag(seat: &Seat) -> Option<PlayerTag> {
+    let form = seat.form.filter(|f| is_carry(f))?;
+    let (n, w) = (form.games, form.won_games);
+    let rate = w as f64 / n as f64 * 100.0;
+    let mut detail = format!(
+        "近 {n} 场排位 {w} 胜 {} 负（胜率 {rate:.0}%），表现远超同位置平均水平",
+        n - w
+    );
+    if !form.position_games.is_empty() {
+        detail.push_str(&format!("，常玩{}", comfortable_positions(form)));
+    }
+    detail.push('。');
+    let tone = if seat.ally {
+        Tone::Positive
+    } else {
+        Tone::Warning
+    };
+    Some(tag("carry", "小代", tone, detail, 86))
+}
+
+fn games_on(form: &RankedForm, position: &str) -> usize {
+    let entry = form.position_games.iter().find(|(p, _)| p == position);
+    entry.map_or(0, |(_, n)| *n)
+}
+
+fn comfortable(form: &RankedForm, position: &str) -> bool {
+    let n = form.positioned_games.max(1) as f64;
+    games_on(form, position) as f64 / n >= limits::COMFORT_SHARE
+}
+
+/// "打野（12 场）、上单（5 场）": the comfortable positions, else the most played one.
+fn comfortable_positions(form: &RankedForm) -> String {
+    let mut parts = Vec::new();
+    for (i, (position, n)) in form.position_games.iter().enumerate() {
+        if i == 0 || comfortable(form, position) {
+            parts.push(format!("{}（{n} 场）", position_name(position)));
+        }
+    }
+    parts.join("、")
+}
+
 /// 补位: this game's position is one the player rarely plays in ranked.
 fn position_tag(seat: &Seat) -> Option<PlayerTag> {
     let form = seat.form?;
@@ -482,7 +582,6 @@ mod tests {
     use super::*;
     use crate::services::match_history::DataSource;
     use crate::services::player_profile::SampleScope;
-    use crate::state::ongoing::RosterStage;
 
     fn profile(wins: usize, games: usize) -> PlayerProfile {
         PlayerProfile {
@@ -499,11 +598,13 @@ mod tests {
             team: None,
             akari_score: None,
             recent: Vec::new(),
+            recent_ranked: Vec::new(),
             top_champions: Vec::new(),
             position: String::new(),
             tags: Vec::new(),
             form: Some(RankedForm {
                 games,
+                won_games: wins,
                 off_role_games: 0,
                 weight: games as f64,
                 wins: wins as f64,
@@ -513,6 +614,7 @@ mod tests {
                 main_games: 0,
                 role: String::new(),
                 role_games: 0,
+                position_games: Vec::new(),
             }),
         }
     }
@@ -593,6 +695,44 @@ mod tests {
         let m = analyze(&roster, &profiles, &HashMap::new());
         assert!(m.powers["e-JUNGLE"].power < 46.0);
         assert_eq!(tone_of(&m, "e-JUNGLE", "off-role"), Tone::Positive);
+    }
+
+    /// A jungle main with a second top, assigned support.
+    fn carry(position: &str) -> PlayerProfile {
+        let mut p = profile(16, 20);
+        if let Some(form) = p.form.as_mut() {
+            form.performance = Some(0.6);
+            form.positioned_games = 20;
+            form.main_position = "JUNGLE".to_owned();
+            form.main_games = 14;
+            form.role = position.to_owned();
+            form.role_games = 0;
+            form.position_games = vec![("JUNGLE".to_owned(), 14), ("TOP".to_owned(), 6)];
+        }
+        p
+    }
+
+    #[test]
+    fn suggests_swapping_with_an_off_role_carry() {
+        let (mut roster, mut profiles) = game();
+        roster.stage = RosterStage::ChampSelect;
+        roster.enemies.clear();
+        roster.allies[1].is_self = true;
+        profiles.insert("a-UTILITY".to_owned(), carry("UTILITY"));
+        let m = analyze(&roster, &profiles, &HashMap::new());
+        assert!(labels(&m, "a-UTILITY").contains(&"小代".to_owned()));
+        let swap = m.advice.iter().find(|a| a.title.starts_with("和小代换位"));
+        assert_eq!(swap.unwrap().puuid, "a-UTILITY");
+
+        // Nothing to suggest once the game has started, or from a position they do not play.
+        roster.stage = RosterStage::InGame;
+        let m = analyze(&roster, &profiles, &HashMap::new());
+        assert!(!m.advice.iter().any(|a| a.title.starts_with("和小代换位")));
+        roster.stage = RosterStage::ChampSelect;
+        roster.allies[1].is_self = false;
+        roster.allies[2].is_self = true;
+        let m = analyze(&roster, &profiles, &HashMap::new());
+        assert!(!m.advice.iter().any(|a| a.title.starts_with("和小代换位")));
     }
 
     #[test]

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { api, PANEL_HISTORY_COUNT, type DataSource, type GameSummary, type Summoner } from "../api";
 import CareerPanel from "../components/career/CareerPanel.vue";
 import AppIcon from "../components/common/AppIcon.vue";
@@ -40,6 +40,16 @@ const AUTO_LOAD_LIMIT = 200;
 const lcu = useLcuStore();
 const gd = useGameDataStore();
 const route = useRoute();
+const router = useRouter();
+
+/** Opened from a player card in the game panel: offer the way straight back. */
+const fromOngoing = computed(() => route.query.from === "ongoing");
+
+function backToGame() {
+  const back = window.history.state?.back;
+  if (typeof back === "string" && back.startsWith("/ongoing-game")) router.back();
+  else router.push("/ongoing-game");
+}
 
 /** Game list or career analysis of the shown player. */
 const view = ref<"games" | "career">("games");
@@ -214,6 +224,10 @@ watch(
 <template>
   <section class="stagger flex max-w-6xl flex-col gap-4">
     <header class="page-header flex items-end gap-4">
+      <button v-if="fromOngoing" type="button" class="btn btn-secondary self-center" @click="backToGame">
+        <AppIcon name="back" :size="15" />
+        返回对局
+      </button>
       <div>
         <div class="eyebrow">Match history</div>
         <h1 class="page-title mt-1">战绩</h1>

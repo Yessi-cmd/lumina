@@ -110,12 +110,24 @@ const winRateClass = computed(() => {
   return "text-zinc-200";
 });
 
+/** Recent results across all modes, and ranked on its own: an ARAM losing run should not
+ * read as a bad ranked player. */
+const resultRows = computed(() => {
+  const p = profile.value;
+  if (!p) return [];
+  const rows = [{ label: "近期", results: p.recent, tip: "最近对局（含娱乐模式），左边最新" }];
+  if (p.recentRanked.length) {
+    rows.push({ label: "排位", results: p.recentRanked, tip: "最近单双排/灵活排位，左边最新" });
+  }
+  return rows;
+});
+
 function percent(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
 function openHistory() {
-  router.push({ path: "/match-history", query: { puuid: props.player.puuid } });
+  router.push({ path: "/match-history", query: { puuid: props.player.puuid, from: "ongoing" } });
 }
 </script>
 
@@ -208,15 +220,23 @@ function openHistory() {
           <span>经济 {{ percent(profile.team.goldShare) }}</span>
           <span>参团 {{ percent(profile.team.killParticipation) }}</span>
         </div>
-        <div class="mt-1 flex items-center gap-3">
-          <div class="flex gap-0.5">
-            <span
-              v-for="(r, i) in profile.recent"
-              :key="i"
-              class="size-2 rounded-full transition-transform duration-300 ease-spring group-hover:scale-125"
-              :class="DOT[r]"
-              :style="{ transitionDelay: `${i * 20}ms` }"
-            />
+        <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <div
+            v-for="row in resultRows"
+            :key="row.label"
+            class="flex items-center gap-1"
+            v-tip="row.tip"
+          >
+            <span class="text-[10px] leading-none text-zinc-500">{{ row.label }}</span>
+            <div class="flex gap-0.5">
+              <span
+                v-for="(r, i) in row.results"
+                :key="i"
+                class="size-2 rounded-full transition-transform duration-300 ease-spring group-hover:scale-125"
+                :class="DOT[r]"
+                :style="{ transitionDelay: `${i * 20}ms` }"
+              />
+            </div>
           </div>
           <div class="flex gap-1">
             <img

@@ -435,6 +435,8 @@ export interface PlayerProfile {
   } | null;
   akariScore: { total: number; max: number; games: number; outstanding: boolean; extraordinary: boolean } | null;
   recent: GameResult[];
+  /** Solo/duo and flex only. */
+  recentRanked: GameResult[];
   topChampions: { championId: number; games: number; wins: number }[];
   position: string;
   tags: PlayerTag[];

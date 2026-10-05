@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { api, type GameDetail, type PlayerBuild, type PlayerLine, type TeamDetail } from "../../api";
 import { useGameDataStore } from "../../stores/gameData";
 
@@ -11,6 +11,7 @@ const props = defineProps<{
 }>();
 const gd = useGameDataStore();
 const router = useRouter();
+const route = useRoute();
 
 type Tab = "overview" | "stats" | "builds" | "runes";
 const TABS: { id: Tab; label: string }[] = [
@@ -78,7 +79,9 @@ function k(value: number): string {
 
 function openPlayer(p: PlayerLine) {
   if (p.puuid && p.puuid !== props.puuid) {
-    router.push({ path: "/match-history", query: { puuid: p.puuid } });
+    // Keep the way back to the game panel when browsing from there.
+    const from = route.query.from;
+    router.push({ path: "/match-history", query: { puuid: p.puuid, ...(from ? { from } : {}) } });
   }
 }
 

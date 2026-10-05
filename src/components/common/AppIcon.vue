@@ -15,6 +15,7 @@ const ICONS = {
   minimize: '<path d="M5 12h14"/>',
   maximize: '<rect x="5" y="5" width="14" height="14" rx="2"/>',
   close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  back: '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   folder:

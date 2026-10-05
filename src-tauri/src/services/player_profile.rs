@@ -142,6 +142,8 @@ pub struct PlayerProfile {
     pub akari_score: Option<AkariScore>,
     /// Most recent first, across all queues.
     pub recent: Vec<GameResult>,
+    /// Most recent first, solo/duo and flex only.
+    pub recent_ranked: Vec<GameResult>,
     pub top_champions: Vec<ChampionStat>,
     /// Position used for baselines: the current assignment, else the most played one.
     pub position: String,
@@ -156,6 +158,8 @@ pub struct PlayerProfile {
 #[derive(Debug, Clone)]
 pub struct RankedForm {
     pub games: usize,
+    /// Ranked games won, unweighted.
+    pub won_games: usize,
     pub off_role_games: usize,
     /// Sum of game weights, and of the weights of the games won.
     pub weight: f64,
@@ -169,6 +173,8 @@ pub struct RankedForm {
     pub main_games: usize,
     pub role: String,
     pub role_games: usize,
+    /// Games per known position, most played first.
+    pub position_games: Vec<(String, usize)>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -262,6 +268,12 @@ pub fn build(page: &MatchHistoryPage, ctx: &ProfileContext) -> PlayerProfile {
         team,
         akari_score,
         recent: all.iter().take(10).map(|g| g.result).collect(),
+        recent_ranked: counted
+            .iter()
+            .filter(|g| is_ranked(g))
+            .take(10)
+            .map(|g| g.result)
+            .collect(),
         top_champions: top_champions(&counted),
         position,
         tags,
@@ -289,7 +301,6 @@ impl Facts<'_> {
     fn tags(&self) -> Vec<PlayerTag> {
         let rules = [
             self.suspicious_boosting(),
-            self.streak(),
             self.akari_score_tag(),
             self.high_win_rate(),
             self.champion_familiarity(),
@@ -300,7 +311,9 @@ impl Facts<'_> {
             self.kill_damage_efficiency(),
             self.missing_pings(),
         ];
-        rules.into_iter().flatten().collect()
+        let mut tags: Vec<PlayerTag> = rules.into_iter().flatten().collect();
+        tags.extend(self.streaks());
+        tags
     }
 
     fn scope_text(&self) -> String {
@@ -318,25 +331,22 @@ impl Facts<'_> {
         queue == 0 || CLASSIC_QUEUES.contains(&queue)
     }
 
-    fn streak(&self) -> Option<PlayerTag> {
-        let first = self.counted.first()?.result;
-        let same = self.counted.iter().take_while(|g| g.result == first);
-        let len = same.count();
-        if len < limits::STREAK_MIN {
-            return None;
+    /// The run of identical results up to the latest game, plus the ranked run on its own.
+    /// A losing run of ARAM games says little about how someone plays ranked, so the
+    /// label counts the entertainment games and a mostly casual run is shown as neutral.
+    fn streaks(&self) -> Vec<PlayerTag> {
+        let mut tags = Vec::new();
+        let all = run_of(self.counted);
+        let mut ranked_games = self.counted.to_vec();
+        ranked_games.retain(|g| is_ranked(g));
+        let ranked = run_of(&ranked_games);
+        // An all-ranked run that is the whole ranked run: one tag says it all.
+        let same_run = all.len() == ranked.len() && all.iter().all(|g| is_ranked(g));
+        if !same_run && all.len() >= limits::STREAK_MIN {
+            tags.push(mixed_streak(all));
         }
-        let (label, tone, word) = match first {
-            GameResult::Win => (format!("{len} 连胜"), Tone::Positive, "连胜"),
-            _ => (format!("{len} 连败"), Tone::Negative, "连败"),
-        };
-        Some(tag(
-            "streak",
-            label,
-            tone,
-            format!("截至最近一局，已经 {len} {word}（不计重开）。"),
-            false,
-            80,
-        ))
+        tags.extend(ranked_streak(ranked));
+        tags
     }
 
     fn high_win_rate(&self) -> Option<PlayerTag> {
@@ -625,6 +635,73 @@ fn tag(
     }
 }
 
+/// The leading games that share the first game's result.
+fn run_of<'a, 'b>(games: &'b [&'a GameSummary]) -> &'b [&'a GameSummary] {
+    let Some(first) = games.first() else {
+        return games;
+    };
+    let same = games.iter().take_while(|g| g.result == first.result);
+    let len = same.count();
+    &games[..len]
+}
+
+/// "连胜" or "连败", how every game ended, and the tone of the run.
+fn streak_words(run: &[&GameSummary]) -> (&'static str, &'static str, Tone) {
+    match run.first().map(|g| g.result) {
+        Some(GameResult::Win) => ("连胜", "获胜", Tone::Positive),
+        _ => ("连败", "失败", Tone::Negative),
+    }
+}
+
+/// A run across all modes, labelled with how many of its games were entertainment modes.
+fn mixed_streak(run: &[&GameSummary]) -> PlayerTag {
+    let len = run.len();
+    let (word, _, tone) = streak_words(run);
+    let ranked = run.iter().filter(|g| is_ranked(g)).count();
+    let casual = run.iter().filter(|g| is_entertainment(g)).count();
+    let other = len - ranked - casual;
+    let label = match casual {
+        0 => format!("{len} {word}"),
+        _ => format!("近期 {len} {word}（{casual} 娱乐）"),
+    };
+    let mut parts = Vec::new();
+    let kinds = [(ranked, "排位"), (casual, "娱乐模式"), (other, "其他")];
+    for (n, name) in kinds {
+        if n > 0 {
+            parts.push(format!("{name} {n} 场"));
+        }
+    }
+    let parts = parts.join("、");
+    let mut detail = format!("截至最近一局，已经 {len} {word}（不计重开），其中{parts}。");
+    let mostly_casual = casual * 2 >= len;
+    if mostly_casual {
+        detail.push_str("大部分是娱乐模式，不太能说明排位水平。");
+    }
+    let (tone, priority) = if mostly_casual {
+        (Tone::Neutral, 40)
+    } else {
+        (tone, 78)
+    };
+    tag("streak", label, tone, detail, false, priority)
+}
+
+/// A run of solo/duo and flex games, skipping other modes in between.
+fn ranked_streak(run: &[&GameSummary]) -> Option<PlayerTag> {
+    let len = run.len();
+    if len < limits::STREAK_MIN {
+        return None;
+    }
+    let (word, outcome, tone) = streak_words(run);
+    Some(tag(
+        "ranked-streak",
+        format!("排位 {len} {word}"),
+        tone,
+        format!("最近 {len} 场单双排/灵活排位全部{outcome}（不计重开，不看其他模式）。"),
+        false,
+        80,
+    ))
+}
+
 fn counts(game: &GameSummary) -> bool {
     matches!(game.result, GameResult::Win | GameResult::Loss)
 }
@@ -720,8 +797,22 @@ pub fn ranked_form(games: &[&GameSummary], position: &str) -> Option<RankedForm>
     }
     let main = main_position(&ranked);
     let on = |p: &str| ranked.iter().filter(|g| g.position == p).count();
+    let mut positions: Vec<(String, usize)> = Vec::new();
+    for game in &ranked {
+        if game.position.is_empty() {
+            continue;
+        }
+        match positions.iter_mut().find(|(p, _)| *p == game.position) {
+            Some(entry) => entry.1 += 1,
+            None => positions.push((game.position.clone(), 1)),
+        }
+    }
+    positions.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
+    let won = ranked.iter().filter(|g| g.result == GameResult::Win);
+    let won_games = won.count();
     let mut form = RankedForm {
         games: ranked.len(),
+        won_games,
         off_role_games: 0,
         weight: 0.0,
         wins: 0.0,
@@ -731,6 +822,7 @@ pub fn ranked_form(games: &[&GameSummary], position: &str) -> Option<RankedForm>
         role_games: on(position),
         main_position: main,
         role: position.to_owned(),
+        position_games: positions,
     };
     // Off-role means away from this game's position, else from the usual one.
     let role = match position {
@@ -1049,9 +1141,33 @@ mod tests {
         games.extend(many(3, 420, GameResult::Loss, [1, 5, 1]));
         games.extend(many(1, 420, GameResult::Win, [5, 1, 5]));
         let profile = build(&page(games), &ProfileContext::default());
-        let streak = profile.tags.iter().find(|t| t.id == "streak").unwrap();
-        assert_eq!(streak.label, "3 连败");
+        let streak = profile.tags.iter().find(|t| t.id == "ranked-streak").unwrap();
+        assert_eq!(streak.label, "排位 3 连败");
         assert_eq!(streak.tone, Tone::Negative);
+        assert!(!has(&profile, "streak"));
+    }
+
+    #[test]
+    fn streak_counts_entertainment_games_separately() {
+        let mut games = many(5, 450, GameResult::Loss, [1, 5, 1]);
+        games.extend(many(2, 420, GameResult::Loss, [1, 5, 1]));
+        games.extend(many(3, 420, GameResult::Win, [5, 1, 5]));
+        let profile = build(&page(games), &ProfileContext::default());
+        let streak = profile.tags.iter().find(|t| t.id == "streak").unwrap();
+        assert_eq!(streak.label, "近期 7 连败（5 娱乐）");
+        assert_eq!(streak.tone, Tone::Neutral);
+        assert!(!has(&profile, "ranked-streak"));
+        assert_eq!(profile.recent_ranked.len(), 5);
+    }
+
+    #[test]
+    fn ranked_streak_skips_other_modes() {
+        let mut games = many(1, 450, GameResult::Loss, [1, 5, 1]);
+        games.extend(many(3, 420, GameResult::Win, [5, 1, 5]));
+        let profile = build(&page(games), &ProfileContext::default());
+        let streak = profile.tags.iter().find(|t| t.id == "ranked-streak").unwrap();
+        assert_eq!(streak.label, "排位 3 连胜");
+        assert!(!has(&profile, "streak"));
     }
 
     #[test]
@@ -1078,6 +1194,8 @@ mod tests {
         assert_eq!(form.positioned_games, 5);
         assert_eq!(form.main_position, "MIDDLE");
         assert_eq!((form.main_games, form.role_games), (4, 1));
+        assert_eq!(form.position_games[0], ("MIDDLE".to_owned(), 4));
+        assert_eq!(form.won_games, 6);
     }
 
     #[test]
