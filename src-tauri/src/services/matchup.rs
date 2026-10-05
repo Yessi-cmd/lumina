@@ -60,8 +60,10 @@ mod limits {
     pub const CARRY_MIN_GAMES: usize = 8;
     pub const CARRY_WIN_RATE: f64 = 0.65;
     pub const CARRY_PERFORMANCE: f64 = 0.3;
-    /// 小代 also: this many standout games among the latest ranked games.
+    /// 小代 also: this many standout games among the latest ranked games, while winning
+    /// at least half of the recent ranked games.
     pub const CARRY_STANDOUTS: usize = 3;
+    pub const CARRY_STANDOUT_WIN_RATE: f64 = 0.5;
     /// A position with this share of a player's positioned ranked games is one they are
     /// comfortable on.
     pub const COMFORT_SHARE: f64 = 0.25;
@@ -483,7 +485,12 @@ fn gank_and_lane_tags(seat: &Seat) -> Vec<PlayerTag> {
 /// A few standout games lately, or recent ranked games mostly won and well above the
 /// average player on the same position.
 fn is_carry(form: &RankedForm) -> bool {
-    form.standouts.len() >= limits::CARRY_STANDOUTS || is_consistent(form)
+    has_standouts(form) || is_consistent(form)
+}
+
+fn has_standouts(form: &RankedForm) -> bool {
+    let rate = form.won_games as f64 / form.games.max(1) as f64;
+    form.standouts.len() >= limits::CARRY_STANDOUTS && rate >= limits::CARRY_STANDOUT_WIN_RATE
 }
 
 fn is_consistent(form: &RankedForm) -> bool {
@@ -506,7 +513,7 @@ fn carry_tag(seat: &Seat) -> Option<PlayerTag> {
         detail.push_str("，表现远超同位置平均水平");
     }
     let k = form.standouts.len();
-    if k >= limits::CARRY_STANDOUTS {
+    if has_standouts(form) {
         let lines: Vec<String> = form.standouts.iter().take(3).map(kda_text).collect();
         let (recent, lines) = (form.recent_games, lines.join("、"));
         detail.push_str(&format!("，最近 {recent} 场有 {k} 场炸裂局（{lines}）"));
@@ -767,6 +774,15 @@ mod tests {
         let t = m.tags["a-TOP"].iter().find(|t| t.id == "carry").unwrap();
         assert!(t.detail.contains("22/3/10"));
         assert!(!labels(&m, "a-JUNGLE").contains(&"小代".to_owned()));
+
+        // Standout games while losing most ranked games do not make a carry.
+        let mut p = profile(3, 10);
+        if let Some(form) = p.form.as_mut() {
+            form.standouts = vec![[22, 3, 10], [15, 1, 12], [12, 2, 14]];
+        }
+        profiles.insert("a-TOP".to_owned(), p);
+        let m = analyze(&roster, &profiles, &HashMap::new());
+        assert!(!labels(&m, "a-TOP").contains(&"小代".to_owned()));
     }
 
     #[test]

@@ -59,12 +59,12 @@ mod limits {
     pub const OFF_ROLE_WEIGHT: f64 = 0.3;
     /// Deaths per 10 minutes of an average ranked player.
     pub const DEATHS_PER_10: f64 = 2.0;
-    /// Lumina: a standout ranked game, among the latest few: 20 kills, or a KDA of 6
-    /// with at least 15 takedowns (so 0/0/6 does not count).
+    /// Lumina: a standout ranked game, among the latest few: 20 kills, or 10 kills at a
+    /// KDA of 5. Kills, not assists: a support's 3/4/21 is a KDA of 6 but carries no one.
     pub const STANDOUT_WINDOW: usize = 10;
     pub const STANDOUT_KILLS: i64 = 20;
-    pub const STANDOUT_KDA: f64 = 6.0;
-    pub const STANDOUT_TAKEDOWNS: i64 = 15;
+    pub const STANDOUT_CARRY_KILLS: i64 = 10;
+    pub const STANDOUT_KDA: f64 = 5.0;
 }
 
 const RANKED_QUEUES: [i64; 2] = [420, 440];
@@ -870,11 +870,10 @@ pub fn ranked_form(games: &[&GameSummary], position: &str) -> Option<RankedForm>
     Some(form)
 }
 
-/// A game that stands out on its own: lots of kills, or a high KDA with real takedowns.
+/// A game the player carried with their own kills: lots of them, or many at a high KDA.
 fn is_standout(game: &GameSummary) -> bool {
-    let takedowns = game.kills + game.assists;
-    let high_kda = kda(game) >= limits::STANDOUT_KDA && takedowns >= limits::STANDOUT_TAKEDOWNS;
-    game.kills >= limits::STANDOUT_KILLS || high_kda
+    let carried = game.kills >= limits::STANDOUT_CARRY_KILLS && kda(game) >= limits::STANDOUT_KDA;
+    game.kills >= limits::STANDOUT_KILLS || carried
 }
 
 /// One game against the average player on the same position. Each part stays within ±1,
@@ -1236,6 +1235,8 @@ mod tests {
         games[2].assists = 30;
         games[2].deaths = 6;
         games[3].deaths = 0;
+        games[4].deaths = 1;
+        games[4].assists = 30;
         let refs: Vec<&GameSummary> = games.iter().collect();
         let form = ranked_form(&refs, "").unwrap();
         assert_eq!(form.recent_games, 6);
