@@ -94,6 +94,14 @@ const tags = computed(() => {
   return all.sort((a, b) => b.priority - a.priority);
 });
 const shownTags = computed(() => tags.value.slice(0, MAX_TAGS));
+/** 小代 cards burn: gold for a teammate, red for an opponent. */
+const carryCard = computed(() => {
+  const carry = tags.value.find((t) => t.id === "carry");
+  if (!carry) return "";
+  return carry.tone === "positive"
+    ? "border-orange-400/50 bg-linear-to-r from-orange-500/[0.14] via-red-500/[0.05] to-zinc-900/65 shadow-[0_0_22px_-8px_rgb(249_115_22/0.75)] hover:border-orange-300/70"
+    : "border-red-500/50 bg-linear-to-r from-red-600/[0.16] via-fuchsia-600/[0.05] to-zinc-900/65 shadow-[0_0_22px_-8px_rgb(239_68_68/0.8)] hover:border-red-400/70";
+});
 const hiddenTags = computed(() => tags.value.slice(MAX_TAGS));
 
 const powerClass = computed(() => {
@@ -137,7 +145,7 @@ function openHistory() {
     :class="
       player.isSelf
         ? 'animate-glow border-amber-400/40 bg-linear-to-r from-amber-500/[0.08] to-zinc-900/65 shadow-[0_0_0_1px_rgb(245_158_11/0.1),0_8px_24px_-14px_rgb(245_158_11/0.5)]'
-        : 'border-white/[0.06] hover:border-white/[0.12]'
+        : carryCard || 'border-white/[0.06] hover:border-white/[0.12]'
     "
     role="link"
     tabindex="0"

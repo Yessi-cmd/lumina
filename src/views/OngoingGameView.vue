@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import type { RosterPlayer, TagTone } from "../api";
+import { computed, ref, shallowRef, watch } from "vue";
+import { api, type RosterPlayer, type TagTone } from "../api";
 import ChampionAssistant from "../components/champion/ChampionAssistant.vue";
 import PlayerCard from "../components/player/PlayerCard.vue";
 import { useGameDataStore } from "../stores/gameData";
@@ -36,6 +36,78 @@ const ADVICE_TONE: Record<TagTone, string> = {
   warning: "border-amber-400/20 bg-linear-to-br from-amber-500/10 to-amber-500/[0.02]",
   neutral: "border-white/[0.06] bg-zinc-900/75",
 };
+
+// --- 敌方速报: one line per opponent, copied for the in-game chat ---------------------
+const NEWLINE = "\n";
+const LANE_ORDER = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"];
+const showReport = ref(false);
+const reportLines = shallowRef<string[]>([]);
+const reportLoading = ref(false);
+const copied = ref<number | "all" | null>(null);
+let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** "名字 上单 上等马 小代 胜率62% KDA3.4", opponents ordered top to support. */
+async function buildReport(): Promise<string[]> {
+  const r = roster.value;
+  if (!r) return [];
+  const rows = await Promise.all(
+    r.enemies.map(async (p) => {
+      const [summoner, profile] = await Promise.all([
+        api.summonerByPuuid(p.puuid).catch(() => null),
+        api.playerProfile(p.puuid, p.championId, r.queueId, p.position).catch(() => null),
+      ]);
+      const name = summoner?.gameName || summoner?.displayName || gd.championName(p.championId);
+      const lane = p.position || profile?.position || "";
+      const power = insights.value?.powers[p.puuid];
+      const tier = !power
+        ? "数据不足"
+        : power.tier === "top"
+          ? "上等马"
+          : power.tier === "bottom"
+            ? "下等马"
+            : "中等马";
+      const carry = insights.value?.tags[p.puuid]?.some((t) => t.id === "carry") ? " 小代" : "";
+      const stats =
+        profile && profile.sampleGames > 0
+          ? `胜率${Math.round(profile.winRate * 100)}% KDA${profile.avgKda.toFixed(1)}`
+          : "近期无战绩";
+      const text = `${name} ${POSITIONS[lane] ?? "未知位置"} ${tier}${carry} ${stats}`;
+      const order = LANE_ORDER.indexOf(lane);
+      return { text, order: order < 0 ? LANE_ORDER.length : order };
+    }),
+  );
+  return rows.sort((a, b) => a.order - b.order).map((row) => row.text);
+}
+
+async function refreshReport() {
+  reportLoading.value = true;
+  try {
+    reportLines.value = await buildReport();
+  } finally {
+    reportLoading.value = false;
+  }
+}
+
+function toggleReport() {
+  showReport.value = !showReport.value;
+  if (showReport.value) refreshReport();
+}
+
+// Tiers arrive with the detailed analysis; keep an open report up to date.
+watch(insights, () => {
+  if (showReport.value) refreshReport();
+});
+
+async function copy(text: string, which: number | "all") {
+  try {
+    await navigator.clipboard.writeText(text);
+    copied.value = which;
+    clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => (copied.value = null), 1500);
+  } catch (err) {
+    console.warn("Failed to copy", err);
+  }
+}
 
 function championOf(puuid: string): number {
   const r = roster.value;
@@ -151,7 +223,40 @@ function championOf(puuid: string): number {
           <h2 v-else class="flex items-center gap-2 px-1 text-xs font-semibold text-red-300">
             <span class="h-3 w-1 rounded-full bg-red-400 shadow-[0_0_10px_rgb(248_113_113/0.7)]" />
             敌方
+            <button
+              v-if="roster.stage === 'inGame' && roster.enemies.length"
+              type="button"
+              class="ml-auto rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-medium text-zinc-300 transition-colors hover:border-red-400/40 hover:text-red-200"
+              @click="toggleReport"
+            >
+              {{ showReport ? "收起速报" : "敌方速报" }}
+            </button>
           </h2>
+          <div
+            v-if="showReport && roster.stage === 'inGame'"
+            class="flex flex-col gap-1 rounded-xl border border-red-400/20 bg-zinc-900/75 p-2 text-xs backdrop-blur-md"
+          >
+            <p v-if="reportLoading && !reportLines.length" class="px-1 text-zinc-500">正在整理敌方信息…</p>
+            <button
+              v-for="(line, i) in reportLines"
+              :key="i"
+              type="button"
+              class="flex items-center gap-2 rounded-md px-2 py-1 text-left text-zinc-200 transition-colors hover:bg-white/5"
+              v-tip="'点击复制这一行'"
+              @click="copy(line, i)"
+            >
+              <span class="min-w-0 flex-1 truncate select-text">{{ line }}</span>
+              <span class="shrink-0 text-[11px]" :class="copied === i ? 'text-emerald-400' : 'text-zinc-500'">
+                {{ copied === i ? "已复制" : "复制" }}
+              </span>
+            </button>
+            <div v-if="reportLines.length" class="flex items-center gap-2 px-1 pt-1">
+              <span class="flex-1 text-[11px] text-zinc-500">复制后在游戏里按回车，Ctrl+V 粘贴发送。</span>
+              <button type="button" class="btn btn-secondary px-2 py-0.5 text-xs" @click="copy(reportLines.join(NEWLINE), 'all')">
+                {{ copied === "all" ? "已复制" : "复制全部" }}
+              </button>
+            </div>
+          </div>
           <PlayerCard
             v-for="p in roster.enemies"
             :key="p.puuid"
