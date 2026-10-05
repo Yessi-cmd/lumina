@@ -663,6 +663,7 @@ mod tests {
             top_champions: Vec::new(),
             position: String::new(),
             tags: Vec::new(),
+            week: None,
             form: Some(RankedForm {
                 games,
                 won_games: wins,

@@ -437,6 +437,8 @@ export interface PlayerProfile {
   recent: GameResult[];
   /** Solo/duo and flex only. */
   recentRanked: GameResult[];
+  /** Solo/duo and flex record of the last 7 days. */
+  week: { games: number; wins: number } | null;
   topChampions: { championId: number; games: number; wins: number }[];
   position: string;
   tags: PlayerTag[];

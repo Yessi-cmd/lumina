@@ -111,6 +111,18 @@ const powerClass = computed(() => {
   return "bg-white/5 text-zinc-300 ring-white/10";
 });
 
+/** Fewer ranked games this week than this and the rate is marked 样本少. */
+const WEEK_SAMPLE_MIN = 5;
+const week = computed(() => profile.value?.week ?? null);
+const weekClass = computed(() => {
+  const w = week.value;
+  if (!w || w.games === 0) return "text-zinc-500";
+  const rate = w.wins / w.games;
+  if (rate >= 0.6) return "text-emerald-400";
+  if (rate < 0.45) return "text-red-400";
+  return "text-zinc-200";
+});
+
 const winRateClass = computed(() => {
   const rate = profile.value?.winRate ?? 0;
   if (rate >= 0.6) return "text-emerald-400";
@@ -204,8 +216,28 @@ function openHistory() {
       <p v-else-if="profile.sampleGames === 0" class="mt-1 text-xs text-zinc-500">近期没有对局</p>
       <template v-else>
         <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
-          <span :class="winRateClass" v-tip="`样本：近期${SCOPES[profile.scope]}对局`">
-            胜率 {{ percent(profile.winRate) }}
+          <span
+            v-if="week"
+            :class="weekClass"
+            v-tip="`最近 7 天单双排和灵活排位${week.games < WEEK_SAMPLE_MIN ? '，场次较少，仅供参考' : ''}`"
+          >
+            <template v-if="week.games > 0">
+              本周排位 {{ percent(week.wins / week.games) }}
+              <span class="text-zinc-500">({{ week.wins }}/{{ week.games }})</span>
+            </template>
+            <template v-else>本周无排位</template>
+            <span
+              v-if="week.games < WEEK_SAMPLE_MIN"
+              class="ml-0.5 rounded bg-amber-400/10 px-1 py-px text-[10px] text-amber-300 ring-1 ring-amber-400/25 ring-inset"
+            >
+              样本少
+            </span>
+          </span>
+          <span
+            :class="week ? 'text-zinc-500' : winRateClass"
+            v-tip="`样本：近期${SCOPES[profile.scope]}对局，KDA 和评分也按这些对局算`"
+          >
+            {{ week ? "近期" : "胜率" }} {{ percent(profile.winRate) }}
             <span class="text-zinc-500">
               ({{ profile.wins }}/{{ profile.sampleGames }} {{ SCOPES[profile.scope] }})
             </span>

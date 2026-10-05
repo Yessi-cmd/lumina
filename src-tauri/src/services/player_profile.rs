@@ -14,6 +14,7 @@ use super::match_history::{
     DataSource, GameMetrics, GameResult, GameSummary, MatchHistoryPage, MatchHistoryService,
 };
 use super::ongoing_game::PANEL_HISTORY_COUNT;
+use super::roster_relations::now_ms;
 use crate::error::Result;
 use crate::state::session::LcuSession;
 
@@ -69,6 +70,9 @@ mod limits {
 
 const RANKED_QUEUES: [i64; 2] = [420, 440];
 const WEEK_MS: i64 = 7 * 24 * 60 * 60 * 1000;
+/// Ranked games per ranked queue read for the week's record; the same page the game
+/// panel's analysis fetches, so the two share the cache.
+const WEEK_QUEUE_GAMES: u32 = 20;
 /// Summoner's Rift queues, where champion choice and farming are deliberate.
 const CLASSIC_QUEUES: [i64; 6] = [400, 420, 430, 440, 490, 700];
 const ENTERTAINMENT_QUEUES: [i64; 13] = [
@@ -155,9 +159,18 @@ pub struct PlayerProfile {
     /// Position used for baselines: the current assignment, else the most played one.
     pub position: String,
     pub tags: Vec<PlayerTag>,
+    /// Solo/duo and flex record of the last 7 days; `None` until `load` fills it in.
+    pub week: Option<WeekRecord>,
     /// Input to the power index; `None` without solo/duo or flex games.
     #[serde(skip)]
     pub form: Option<RankedForm>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WeekRecord {
+    pub games: usize,
+    pub wins: usize,
 }
 
 /// Solo/duo and flex games only, recent games and games on the current position
@@ -231,7 +244,24 @@ pub async fn load(
     ctx: &ProfileContext,
 ) -> Result<PlayerProfile> {
     let page = history.get(session, puuid, 0, PANEL_HISTORY_COUNT).await?;
-    Ok(build(&page, ctx))
+    let mut profile = build(&page, ctx);
+
+    // The shared page mixes modes, so add the ranked pages SGP filters on the server.
+    let mut games = page.games.clone();
+    if session.sgp.is_some() {
+        for queue in RANKED_QUEUES {
+            let request = history.get_queue(session, puuid, 0, WEEK_QUEUE_GAMES, Some(queue));
+            match request.await {
+                Ok(ranked) => games.extend(ranked.games),
+                Err(err) => log::debug!("ranked history for queue {queue} failed: {err}"),
+            }
+        }
+    }
+    games.sort_by_key(|g| std::cmp::Reverse(g.created_at));
+    games.dedup_by_key(|g| g.game_id);
+    let refs: Vec<&GameSummary> = games.iter().collect();
+    profile.week = Some(week_record(&refs, now_ms()));
+    Ok(profile)
 }
 
 pub fn build(page: &MatchHistoryPage, ctx: &ProfileContext) -> PlayerProfile {
@@ -291,6 +321,7 @@ pub fn build(page: &MatchHistoryPage, ctx: &ProfileContext) -> PlayerProfile {
         top_champions: top_champions(&counted),
         position,
         tags,
+        week: None,
         form: ranked_form(&counted, &ctx.position),
     }
 }
@@ -878,15 +909,24 @@ pub fn ranked_form(games: &[&GameSummary], position: &str) -> Option<RankedForm>
 
 /// Counts the ranked games of the 7 days before `now_ms` into the form.
 pub fn add_week(form: &mut RankedForm, games: &[&GameSummary], now_ms: i64) {
+    let week = week_record(games, now_ms);
+    form.week_games = week.games;
+    form.week_wins = week.wins;
+}
+
+/// Solo/duo and flex games and wins in the 7 days before `now_ms`.
+pub fn week_record(games: &[&GameSummary], now_ms: i64) -> WeekRecord {
     let since = now_ms - WEEK_MS;
+    let mut week = WeekRecord::default();
     for game in games {
         if counts(game) && is_ranked(game) && game.created_at >= since {
-            form.week_games += 1;
+            week.games += 1;
             if game.result == GameResult::Win {
-                form.week_wins += 1;
+                week.wins += 1;
             }
         }
     }
+    week
 }
 
 /// A game the player carried with their own kills: lots of them, or many at a high KDA.

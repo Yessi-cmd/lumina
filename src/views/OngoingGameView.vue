@@ -67,10 +67,14 @@ async function buildReport(): Promise<string[]> {
             ? "下等马"
             : "中等马";
       const carry = insights.value?.tags[p.puuid]?.some((t) => t.id === "carry") ? " 小代" : "";
-      const stats =
-        profile && profile.sampleGames > 0
-          ? `胜率${Math.round(profile.winRate * 100)}% KDA${profile.avgKda.toFixed(1)}`
-          : "近期无战绩";
+      const week = profile?.week;
+      const rate = !week
+        ? "胜率未知"
+        : week.games === 0
+          ? "本周无排位"
+          : `本周胜率${Math.round((week.wins / week.games) * 100)}%(${week.wins}/${week.games}${week.games < 5 ? " 样本少" : ""})`;
+      const kda = profile && profile.sampleGames > 0 ? `KDA${profile.avgKda.toFixed(1)}` : "近期无战绩";
+      const stats = `${rate} ${kda}`;
       const text = `${name} ${POSITIONS[lane] ?? "未知位置"} ${tier}${carry} ${stats}`;
       const order = LANE_ORDER.indexOf(lane);
       return { text, order: order < 0 ? LANE_ORDER.length : order };
