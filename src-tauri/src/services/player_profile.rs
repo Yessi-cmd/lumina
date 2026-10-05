@@ -1131,6 +1131,10 @@ mod tests {
         }
     }
 
+    fn tag_of<'a>(profile: &'a PlayerProfile, id: &str) -> &'a PlayerTag {
+        profile.tags.iter().find(|t| t.id == id).unwrap()
+    }
+
     fn has(profile: &PlayerProfile, id: &str) -> bool {
         profile.tags.iter().any(|t| t.id == id)
     }
@@ -1141,7 +1145,7 @@ mod tests {
         games.extend(many(3, 420, GameResult::Loss, [1, 5, 1]));
         games.extend(many(1, 420, GameResult::Win, [5, 1, 5]));
         let profile = build(&page(games), &ProfileContext::default());
-        let streak = profile.tags.iter().find(|t| t.id == "ranked-streak").unwrap();
+        let streak = tag_of(&profile, "ranked-streak");
         assert_eq!(streak.label, "排位 3 连败");
         assert_eq!(streak.tone, Tone::Negative);
         assert!(!has(&profile, "streak"));
@@ -1153,7 +1157,7 @@ mod tests {
         games.extend(many(2, 420, GameResult::Loss, [1, 5, 1]));
         games.extend(many(3, 420, GameResult::Win, [5, 1, 5]));
         let profile = build(&page(games), &ProfileContext::default());
-        let streak = profile.tags.iter().find(|t| t.id == "streak").unwrap();
+        let streak = tag_of(&profile, "streak");
         assert_eq!(streak.label, "近期 7 连败（5 娱乐）");
         assert_eq!(streak.tone, Tone::Neutral);
         assert!(!has(&profile, "ranked-streak"));
@@ -1165,7 +1169,7 @@ mod tests {
         let mut games = many(1, 450, GameResult::Loss, [1, 5, 1]);
         games.extend(many(3, 420, GameResult::Win, [5, 1, 5]));
         let profile = build(&page(games), &ProfileContext::default());
-        let streak = profile.tags.iter().find(|t| t.id == "ranked-streak").unwrap();
+        let streak = tag_of(&profile, "ranked-streak");
         assert_eq!(streak.label, "排位 3 连胜");
         assert!(!has(&profile, "streak"));
     }
