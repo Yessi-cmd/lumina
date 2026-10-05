@@ -66,6 +66,7 @@ pub fn run() {
             commands::profile_background,
             commands::set_profile_background,
             commands::restart_client,
+            commands::restart_game,
             commands::teammates,
             commands::tilt_state,
             commands::dismiss_tilt,

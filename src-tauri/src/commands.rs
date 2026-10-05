@@ -233,6 +233,13 @@ pub async fn restart_client(state: State<'_, AppState>) -> Result<()> {
     services::client_tools::restart_client(&session).await
 }
 
+/// Ends a stuck game and rejoins it through the client's reconnect.
+#[tauri::command]
+pub async fn restart_game(state: State<'_, AppState>) -> Result<()> {
+    let session = state.session()?;
+    services::client_tools::restart_game(&state, &session).await
+}
+
 /// Recorded rank changes of `puuid` (default: the account seen last); later changes
 /// arrive as `rank://updated` events.
 #[tauri::command]

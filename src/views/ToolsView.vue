@@ -149,6 +149,35 @@ async function restart() {
   }
 }
 
+// --- Restart game ----------------------------------------------------------------------
+/** The game can be restarted while it runs, or rejoined after it closed. */
+const inGame = computed(() => ["InProgress", "Reconnect"].includes(lcu.snapshot.gameflowPhase));
+const confirmingGame = ref(false);
+const restartingGame = ref(false);
+const gameNote = ref<Note | null>(null);
+let gameConfirmTimer: ReturnType<typeof setTimeout> | undefined;
+
+async function restartGame() {
+  if (!confirmingGame.value) {
+    confirmingGame.value = true;
+    clearTimeout(gameConfirmTimer);
+    gameConfirmTimer = setTimeout(() => (confirmingGame.value = false), 4000);
+    return;
+  }
+  clearTimeout(gameConfirmTimer);
+  confirmingGame.value = false;
+  restartingGame.value = true;
+  gameNote.value = { ok: true, text: "正在结束游戏进程并等待客户端重新连接，最多约 30 秒…" };
+  try {
+    await api.restartGame();
+    gameNote.value = { ok: true, text: "已重新连接，游戏正在重新加载。" };
+  } catch (err) {
+    gameNote.value = noteOf(err);
+  } finally {
+    restartingGame.value = false;
+  }
+}
+
 function load() {
   if (!lcu.connected) return;
   loadStatus();
@@ -262,9 +291,30 @@ watch(connected, load);
 
       <div class="card flex items-start justify-between gap-6 p-5">
         <div>
+          <div class="font-medium text-zinc-100">重启游戏</div>
+          <div class="mt-0.5 text-sm text-zinc-400">
+            游戏画面卡死、黑屏或无响应时使用。结束游戏进程后自动点「重新连接」，回到同一局。只在游戏中可用；重连期间角色会掉线几十秒。
+          </div>
+          <p v-if="gameNote" class="mt-2 text-sm break-all" :class="gameNote.ok ? 'text-emerald-400' : 'text-red-400'">
+            {{ gameNote.text }}
+          </p>
+        </div>
+        <button
+          class="btn shrink-0"
+          :class="confirmingGame ? 'btn-primary' : 'btn-secondary'"
+          :disabled="restartingGame || !inGame"
+          v-tip="inGame ? undefined : '进入游戏后可用'"
+          @click="restartGame"
+        >
+          {{ restartingGame ? "重启中…" : confirmingGame ? "再点一次确认" : "重启游戏" }}
+        </button>
+      </div>
+
+      <div class="card flex items-start justify-between gap-6 p-5">
+        <div>
           <div class="font-medium text-zinc-100">重启客户端窗口</div>
           <div class="mt-0.5 text-sm text-zinc-400">
-            客户端界面卡住或白屏时使用。只重启客户端窗口，正在进行的游戏不受影响；排队和选人会中断。
+            大厅界面卡住或白屏时使用。只重启客户端窗口，正在进行的游戏不受影响；排队和选人会中断。
           </div>
           <p v-if="restartNote" class="mt-2 text-sm break-all" :class="restartNote.ok ? 'text-emerald-400' : 'text-red-400'">
             {{ restartNote.text }}

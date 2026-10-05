@@ -1,5 +1,8 @@
-//! Small conveniences for the League client: chat status, the career background, and
-//! restarting a stuck client window.
+//! Small conveniences for the League client: chat status, the career background,
+//! restarting a stuck client window, and restarting a stuck game.
+
+use std::ffi::OsStr;
+use std::time::{Duration, Instant};
 
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
@@ -12,6 +15,11 @@ use crate::state::AppState;
 const CHAT_ME: &str = "/lol-chat/v1/me";
 const PROFILE: &str = "/lol-summoner/v1/current-summoner/summoner-profile";
 const RESTART_UX: &str = "/riotclient/kill-and-restart-ux";
+const RECONNECT: &str = "/lol-gameflow/v1/reconnect";
+const GAME_PROCESS: &str = "League of Legends.exe";
+/// How long the client gets to notice the game has closed and offer a reconnect.
+const RECONNECT_WAIT: Duration = Duration::from_secs(30);
+const PHASE_POLL: Duration = Duration::from_millis(500);
 /// Online, away and invisible.
 const AVAILABILITIES: [&str; 3] = ["chat", "away", "offline"];
 const MAX_STATUS_CHARS: usize = 100;
@@ -117,6 +125,50 @@ pub async fn set_profile_background(session: &LcuSession, skin_id: i64) -> Resul
 /// to the client comes back by itself.
 pub async fn restart_client(session: &LcuSession) -> Result<()> {
     session.http.post_empty(RESTART_UX).await
+}
+
+/// Ends a stuck game process and rejoins the same game through the client's reconnect,
+/// as if the player had clicked 重新连接. Only closes the process; nothing is written to it.
+pub async fn restart_game(state: &AppState, session: &LcuSession) -> Result<()> {
+    let phase = state.lcu_snapshot().gameflow_phase;
+    if phase != "InProgress" && phase != "Reconnect" {
+        return Err(AppError::Message("当前不在游戏中，无需重启游戏".to_owned()));
+    }
+    if phase == "InProgress" {
+        let task = tauri::async_runtime::spawn_blocking(kill_game);
+        let joined = task.await;
+        let (found, killed) = joined.map_err(|e| AppError::Message(e.to_string()))?;
+        log::info!("restart game: {killed} of {found} game processes ended");
+        if found > 0 && killed == 0 {
+            let text = "无法结束游戏进程，请在任务管理器中结束 League of Legends.exe 后重试";
+            return Err(AppError::Message(text.to_owned()));
+        }
+    }
+
+    let deadline = Instant::now() + RECONNECT_WAIT;
+    while state.lcu_snapshot().gameflow_phase != "Reconnect" {
+        if Instant::now() >= deadline {
+            return Err(AppError::Timeout("等待客户端出现重新连接"));
+        }
+        tokio::time::sleep(PHASE_POLL).await;
+    }
+    session.http.post_empty(RECONNECT).await
+}
+
+/// Blocking: ends every game process; returns how many were found and how many ended.
+fn kill_game() -> (usize, usize) {
+    let mut sys = sysinfo::System::new();
+    let names_only = sysinfo::ProcessRefreshKind::nothing();
+    let everything = sysinfo::ProcessesToUpdate::All;
+    sys.refresh_processes_specifics(everything, true, names_only);
+    let (mut found, mut killed) = (0, 0);
+    for process in sys.processes_by_exact_name(OsStr::new(GAME_PROCESS)) {
+        found += 1;
+        if process.kill() {
+            killed += 1;
+        }
+    }
+    (found, killed)
 }
 
 /// The id skins are listed under.

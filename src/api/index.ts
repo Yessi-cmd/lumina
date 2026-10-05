@@ -695,6 +695,7 @@ export const api = {
   profileBackground: () => invoke<number>("profile_background"),
   setProfileBackground: (skinId: number) => invoke<void>("set_profile_background", { skinId }),
   restartClient: () => invoke<void>("restart_client"),
+  restartGame: () => invoke<void>("restart_game"),
   tiltState: () => invoke<TiltWarning | null>("tilt_state"),
   dismissTilt: () => invoke<void>("dismiss_tilt"),
   pushTest: () => invoke<void>("push_test"),
