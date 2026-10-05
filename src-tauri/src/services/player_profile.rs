@@ -59,6 +59,12 @@ mod limits {
     pub const OFF_ROLE_WEIGHT: f64 = 0.3;
     /// Deaths per 10 minutes of an average ranked player.
     pub const DEATHS_PER_10: f64 = 2.0;
+    /// Lumina: a standout ranked game, among the latest few: 20 kills, or a KDA of 6
+    /// with at least 15 takedowns (so 0/0/6 does not count).
+    pub const STANDOUT_WINDOW: usize = 10;
+    pub const STANDOUT_KILLS: i64 = 20;
+    pub const STANDOUT_KDA: f64 = 6.0;
+    pub const STANDOUT_TAKEDOWNS: i64 = 15;
 }
 
 const RANKED_QUEUES: [i64; 2] = [420, 440];
@@ -175,6 +181,10 @@ pub struct RankedForm {
     pub role_games: usize,
     /// Games per known position, most played first.
     pub position_games: Vec<(String, usize)>,
+    /// Ranked games looked at for standout games: the latest few.
+    pub recent_games: usize,
+    /// K/D/A of the standout games among them, newest first.
+    pub standouts: Vec<[i64; 3]>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -810,6 +820,12 @@ pub fn ranked_form(games: &[&GameSummary], position: &str) -> Option<RankedForm>
     positions.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
     let won = ranked.iter().filter(|g| g.result == GameResult::Win);
     let won_games = won.count();
+    let mut standouts = Vec::new();
+    for game in ranked.iter().take(limits::STANDOUT_WINDOW) {
+        if is_standout(game) {
+            standouts.push([game.kills, game.deaths, game.assists]);
+        }
+    }
     let mut form = RankedForm {
         games: ranked.len(),
         won_games,
@@ -823,6 +839,8 @@ pub fn ranked_form(games: &[&GameSummary], position: &str) -> Option<RankedForm>
         main_position: main,
         role: position.to_owned(),
         position_games: positions,
+        recent_games: ranked.len().min(limits::STANDOUT_WINDOW),
+        standouts,
     };
     // Off-role means away from this game's position, else from the usual one.
     let role = match position {
@@ -850,6 +868,13 @@ pub fn ranked_form(games: &[&GameSummary], position: &str) -> Option<RankedForm>
         form.performance = Some(performance / rated);
     }
     Some(form)
+}
+
+/// A game that stands out on its own: lots of kills, or a high KDA with real takedowns.
+fn is_standout(game: &GameSummary) -> bool {
+    let takedowns = game.kills + game.assists;
+    let high_kda = kda(game) >= limits::STANDOUT_KDA && takedowns >= limits::STANDOUT_TAKEDOWNS;
+    game.kills >= limits::STANDOUT_KILLS || high_kda
 }
 
 /// One game against the average player on the same position. Each part stays within ±1,
@@ -1200,6 +1225,21 @@ mod tests {
         assert_eq!((form.main_games, form.role_games), (4, 1));
         assert_eq!(form.position_games[0], ("MIDDLE".to_owned(), 4));
         assert_eq!(form.won_games, 6);
+    }
+
+    #[test]
+    fn ranked_form_counts_standout_games() {
+        let mut games = many(6, 420, GameResult::Win, [5, 2, 5]);
+        games[0].kills = 22;
+        games[1].kills = 12;
+        games[1].deaths = 1;
+        games[2].assists = 30;
+        games[2].deaths = 6;
+        games[3].deaths = 0;
+        let refs: Vec<&GameSummary> = games.iter().collect();
+        let form = ranked_form(&refs, "").unwrap();
+        assert_eq!(form.recent_games, 6);
+        assert_eq!(form.standouts, vec![[22, 2, 5], [12, 1, 5]]);
     }
 
     #[test]

@@ -60,6 +60,8 @@ mod limits {
     pub const CARRY_MIN_GAMES: usize = 8;
     pub const CARRY_WIN_RATE: f64 = 0.65;
     pub const CARRY_PERFORMANCE: f64 = 0.3;
+    /// 小代 also: this many standout games among the latest ranked games.
+    pub const CARRY_STANDOUTS: usize = 3;
     /// A position with this share of a player's positioned ranked games is one they are
     /// comfortable on.
     pub const COMFORT_SHARE: f64 = 0.25;
@@ -478,8 +480,13 @@ fn gank_and_lane_tags(seat: &Seat) -> Vec<PlayerTag> {
     tags
 }
 
-/// Recent ranked games well above the average player on the same position, and mostly won.
+/// A few standout games lately, or recent ranked games mostly won and well above the
+/// average player on the same position.
 fn is_carry(form: &RankedForm) -> bool {
+    form.standouts.len() >= limits::CARRY_STANDOUTS || is_consistent(form)
+}
+
+fn is_consistent(form: &RankedForm) -> bool {
     let Some(performance) = form.performance else {
         return false;
     };
@@ -494,10 +501,16 @@ fn carry_tag(seat: &Seat) -> Option<PlayerTag> {
     let form = seat.form.filter(|f| is_carry(f))?;
     let (n, w) = (form.games, form.won_games);
     let rate = w as f64 / n as f64 * 100.0;
-    let mut detail = format!(
-        "近 {n} 场排位 {w} 胜 {} 负（胜率 {rate:.0}%），表现远超同位置平均水平",
-        n - w
-    );
+    let mut detail = format!("近 {n} 场排位 {w} 胜 {} 负（胜率 {rate:.0}%）", n - w);
+    if is_consistent(form) {
+        detail.push_str("，表现远超同位置平均水平");
+    }
+    let k = form.standouts.len();
+    if k >= limits::CARRY_STANDOUTS {
+        let lines: Vec<String> = form.standouts.iter().take(3).map(kda_text).collect();
+        let (recent, lines) = (form.recent_games, lines.join("、"));
+        detail.push_str(&format!("，最近 {recent} 场有 {k} 场炸裂局（{lines}）"));
+    }
     if !form.position_games.is_empty() {
         detail.push_str(&format!("，常玩{}", comfortable_positions(form)));
     }
@@ -508,6 +521,10 @@ fn carry_tag(seat: &Seat) -> Option<PlayerTag> {
         Tone::Warning
     };
     Some(tag("carry", "小代", tone, detail, 86))
+}
+
+fn kda_text([k, d, a]: &[i64; 3]) -> String {
+    format!("{k}/{d}/{a}")
 }
 
 fn games_on(form: &RankedForm, position: &str) -> usize {
@@ -615,6 +632,8 @@ mod tests {
                 role: String::new(),
                 role_games: 0,
                 position_games: Vec::new(),
+                recent_games: games.min(10),
+                standouts: Vec::new(),
             }),
         }
     }
@@ -733,6 +752,21 @@ mod tests {
         roster.allies[2].is_self = true;
         let m = analyze(&roster, &profiles, &HashMap::new());
         assert!(!m.advice.iter().any(|a| a.title.starts_with("和小代换位")));
+    }
+
+    #[test]
+    fn a_few_standout_games_make_a_carry() {
+        let (roster, mut profiles) = game();
+        let mut p = profile(5, 10);
+        if let Some(form) = p.form.as_mut() {
+            form.standouts = vec![[22, 3, 10], [15, 1, 12], [9, 2, 14]];
+        }
+        profiles.insert("a-TOP".to_owned(), p);
+        let m = analyze(&roster, &profiles, &HashMap::new());
+        assert!(labels(&m, "a-TOP").contains(&"小代".to_owned()));
+        let t = m.tags["a-TOP"].iter().find(|t| t.id == "carry").unwrap();
+        assert!(t.detail.contains("22/3/10"));
+        assert!(!labels(&m, "a-JUNGLE").contains(&"小代".to_owned()));
     }
 
     #[test]
