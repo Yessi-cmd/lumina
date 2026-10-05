@@ -83,7 +83,7 @@ pub async fn load(state: &AppState, detailed: bool) -> Result<RosterInsights> {
     }
     let ranked = ranked_games(state, &session, &roster, &pages).await;
     state.ensure_current_session(&session)?;
-    let profiles = profiles(&roster, &pages, &ranked);
+    let profiles = profiles(&roster, &pages, &ranked, now);
     let early = early_stats(state, &session, &ranked).await;
     if !state.is_current_session(&session) {
         return Err(AppError::NotConnected);
@@ -148,11 +148,12 @@ async fn ranked_games(
 }
 
 /// Profiles judged in the context of this game, with the power index's ranked form
-/// taken from the ranked games.
+/// taken from the ranked games, including those of the week before `now`.
 fn profiles(
     roster: &Roster,
     pages: &[MatchHistoryPage],
     ranked: &HashMap<String, Vec<GameSummary>>,
+    now: i64,
 ) -> HashMap<String, PlayerProfile> {
     let mut out = HashMap::new();
     for player in roster.allies.iter().chain(&roster.enemies) {
@@ -170,6 +171,9 @@ fn profiles(
         if let Some(games) = ranked.get(&player.puuid) {
             let games: Vec<&GameSummary> = games.iter().collect();
             profile.form = player_profile::ranked_form(&games, &player.position);
+            if let Some(form) = profile.form.as_mut() {
+                player_profile::add_week(form, &games, now);
+            }
         }
         out.insert(player.puuid.clone(), profile);
     }

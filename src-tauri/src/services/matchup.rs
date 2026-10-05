@@ -64,6 +64,9 @@ mod limits {
     /// at least half of the recent ranked games.
     pub const CARRY_STANDOUTS: usize = 3;
     pub const CARRY_STANDOUT_WIN_RATE: f64 = 0.5;
+    /// 小代 win rates read the last week of ranked games when it has this many, since
+    /// older games say less about current form; otherwise the recent ranked games.
+    pub const WEEK_MIN_GAMES: usize = 3;
     /// A position with this share of a player's positioned ranked games is one they are
     /// comfortable on.
     pub const COMFORT_SHARE: f64 = 0.25;
@@ -488,8 +491,32 @@ fn is_carry(form: &RankedForm) -> bool {
     has_standouts(form) || is_consistent(form)
 }
 
+/// The win rate the 小代 rules read, from the last week when it has enough ranked games.
+struct CarryRate {
+    rate: f64,
+    games: usize,
+    wins: usize,
+    week: bool,
+}
+
+fn carry_rate(form: &RankedForm) -> CarryRate {
+    let week = form.week_games >= limits::WEEK_MIN_GAMES;
+    let (games, wins) = if week {
+        (form.week_games, form.week_wins)
+    } else {
+        (form.games, form.won_games)
+    };
+    let rate = wins as f64 / games.max(1) as f64;
+    CarryRate {
+        rate,
+        games,
+        wins,
+        week,
+    }
+}
+
 fn has_standouts(form: &RankedForm) -> bool {
-    let rate = form.won_games as f64 / form.games.max(1) as f64;
+    let rate = carry_rate(form).rate;
     form.standouts.len() >= limits::CARRY_STANDOUTS && rate >= limits::CARRY_STANDOUT_WIN_RATE
 }
 
@@ -497,7 +524,7 @@ fn is_consistent(form: &RankedForm) -> bool {
     let Some(performance) = form.performance else {
         return false;
     };
-    let rate = form.won_games as f64 / form.games.max(1) as f64;
+    let rate = carry_rate(form).rate;
     form.games >= limits::CARRY_MIN_GAMES
         && rate >= limits::CARRY_WIN_RATE
         && performance >= limits::CARRY_PERFORMANCE
@@ -506,9 +533,19 @@ fn is_consistent(form: &RankedForm) -> bool {
 /// 小代: a teammate to play around, or an opponent to respect.
 fn carry_tag(seat: &Seat) -> Option<PlayerTag> {
     let form = seat.form.filter(|f| is_carry(f))?;
-    let (n, w) = (form.games, form.won_games);
-    let rate = w as f64 / n as f64 * 100.0;
-    let mut detail = format!("近 {n} 场排位 {w} 胜 {} 负（胜率 {rate:.0}%）", n - w);
+    let CarryRate {
+        rate,
+        games: n,
+        wins: w,
+        week,
+    } = carry_rate(form);
+    let scope = if week {
+        "近一周".to_owned()
+    } else {
+        format!("近 {n} 场")
+    };
+    let rate = rate * 100.0;
+    let mut detail = format!("{scope}排位 {w} 胜 {} 负（胜率 {rate:.0}%）", n - w);
     if is_consistent(form) {
         detail.push_str("，表现远超同位置平均水平");
     }
@@ -641,6 +678,8 @@ mod tests {
                 position_games: Vec::new(),
                 recent_games: games.min(10),
                 standouts: Vec::new(),
+                week_games: 0,
+                week_wins: 0,
             }),
         }
     }
@@ -774,6 +813,17 @@ mod tests {
         let t = m.tags["a-TOP"].iter().find(|t| t.id == "carry").unwrap();
         assert!(t.detail.contains("22/3/10"));
         assert!(!labels(&m, "a-JUNGLE").contains(&"小代".to_owned()));
+
+        // The last week decides when it has enough games: 2 wins in 6 is not a carry.
+        let mut p = profile(8, 10);
+        if let Some(form) = p.form.as_mut() {
+            form.standouts = vec![[22, 3, 10], [15, 1, 12], [12, 2, 14]];
+            form.week_games = 6;
+            form.week_wins = 2;
+        }
+        profiles.insert("a-TOP".to_owned(), p);
+        let m = analyze(&roster, &profiles, &HashMap::new());
+        assert!(!labels(&m, "a-TOP").contains(&"小代".to_owned()));
 
         // Standout games while losing most ranked games do not make a carry.
         let mut p = profile(3, 10);

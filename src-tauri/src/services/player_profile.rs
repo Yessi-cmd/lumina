@@ -68,6 +68,7 @@ mod limits {
 }
 
 const RANKED_QUEUES: [i64; 2] = [420, 440];
+const WEEK_MS: i64 = 7 * 24 * 60 * 60 * 1000;
 /// Summoner's Rift queues, where champion choice and farming are deliberate.
 const CLASSIC_QUEUES: [i64; 6] = [400, 420, 430, 440, 490, 700];
 const ENTERTAINMENT_QUEUES: [i64; 13] = [
@@ -181,6 +182,9 @@ pub struct RankedForm {
     pub role_games: usize,
     /// Games per known position, most played first.
     pub position_games: Vec<(String, usize)>,
+    /// Ranked games and wins of the last 7 days; 0 until `add_week` fills them in.
+    pub week_games: usize,
+    pub week_wins: usize,
     /// Ranked games looked at for standout games: the latest few.
     pub recent_games: usize,
     /// K/D/A of the standout games among them, newest first.
@@ -841,6 +845,8 @@ pub fn ranked_form(games: &[&GameSummary], position: &str) -> Option<RankedForm>
         position_games: positions,
         recent_games: ranked.len().min(limits::STANDOUT_WINDOW),
         standouts,
+        week_games: 0,
+        week_wins: 0,
     };
     // Off-role means away from this game's position, else from the usual one.
     let role = match position {
@@ -868,6 +874,19 @@ pub fn ranked_form(games: &[&GameSummary], position: &str) -> Option<RankedForm>
         form.performance = Some(performance / rated);
     }
     Some(form)
+}
+
+/// Counts the ranked games of the 7 days before `now_ms` into the form.
+pub fn add_week(form: &mut RankedForm, games: &[&GameSummary], now_ms: i64) {
+    let since = now_ms - WEEK_MS;
+    for game in games {
+        if counts(game) && is_ranked(game) && game.created_at >= since {
+            form.week_games += 1;
+            if game.result == GameResult::Win {
+                form.week_wins += 1;
+            }
+        }
+    }
 }
 
 /// A game the player carried with their own kills: lots of them, or many at a high KDA.
@@ -1224,6 +1243,20 @@ mod tests {
         assert_eq!((form.main_games, form.role_games), (4, 1));
         assert_eq!(form.position_games[0], ("MIDDLE".to_owned(), 4));
         assert_eq!(form.won_games, 6);
+    }
+
+    #[test]
+    fn counts_the_last_week_of_ranked_games() {
+        let day = 24 * 60 * 60 * 1000;
+        let mut games = many(4, 420, GameResult::Win, [5, 2, 5]);
+        games.extend(many(2, 450, GameResult::Loss, [5, 2, 5]));
+        for (i, game) in games.iter_mut().enumerate() {
+            game.created_at = 30 * day - i as i64 * 3 * day;
+        }
+        let refs: Vec<&GameSummary> = games.iter().collect();
+        let mut form = ranked_form(&refs, "").unwrap();
+        add_week(&mut form, &refs, 30 * day);
+        assert_eq!((form.week_games, form.week_wins), (3, 3));
     }
 
     #[test]
