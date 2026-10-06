@@ -18,9 +18,10 @@ use crate::state::ongoing::Roster;
 use crate::state::session::LcuSession;
 use crate::state::AppState;
 
-/// Solo/duo and flex: normal, ARAM and bot games say little about how someone plays
-/// ranked, so the power index, laning and gank habits read only these.
-const RANKED_QUEUES: [i64; 2] = [420, 440];
+/// Solo/duo only: normal, ARAM and bot games say little about how someone plays ranked,
+/// and flex is often a premade stack, so the power index, laning and gank habits read
+/// only these.
+const RANKED_QUEUES: [i64; 1] = [420];
 /// Ranked games per player, fetched on top of the shared page so players who mostly
 /// play other modes still get a ranked sample.
 const RANKED_GAMES: u32 = 20;

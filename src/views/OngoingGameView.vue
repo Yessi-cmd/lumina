@@ -71,7 +71,7 @@ async function buildReport(): Promise<string[]> {
       const rate = !week
         ? "胜率未知"
         : week.games === 0
-          ? "本周无排位"
+          ? "本周无单双排"
           : `本周胜率${Math.round((week.wins / week.games) * 100)}%(${week.wins}/${week.games}${week.games < 5 ? " 样本少" : ""})`;
       const kda = profile && profile.sampleGames > 0 ? `KDA${profile.avgKda.toFixed(1)}` : "近期无战绩";
       const stats = `${rate} ${kda}`;

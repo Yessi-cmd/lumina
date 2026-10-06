@@ -38,7 +38,7 @@ const POSITIONS: Record<string, string> = {
   UTILITY: "辅助",
 };
 const SCOPES: Record<SampleScope, string> = {
-  ranked: "排位",
+  ranked: "单双排",
   sameQueue: "同模式",
   all: "全部",
 };
@@ -137,7 +137,7 @@ const resultRows = computed(() => {
   if (!p) return [];
   const rows = [{ label: "近期", results: p.recent, tip: "最近对局（含娱乐模式），左边最新" }];
   if (p.recentRanked.length) {
-    rows.push({ label: "排位", results: p.recentRanked, tip: "最近单双排/灵活排位，左边最新" });
+    rows.push({ label: "单双", results: p.recentRanked, tip: "最近单双排（不含灵活组排），左边最新" });
   }
   return rows;
 });
@@ -219,13 +219,13 @@ function openHistory() {
           <span
             v-if="week"
             :class="weekClass"
-            v-tip="`最近 7 天单双排和灵活排位${week.games < WEEK_SAMPLE_MIN ? '，场次较少，仅供参考' : ''}`"
+            v-tip="`最近 7 天单双排（不含灵活组排）${week.games < WEEK_SAMPLE_MIN ? '，场次较少，仅供参考' : ''}`"
           >
             <template v-if="week.games > 0">
-              本周排位 {{ percent(week.wins / week.games) }}
+              本周单双排 {{ percent(week.wins / week.games) }}
               <span class="text-zinc-500">({{ week.wins }}/{{ week.games }})</span>
             </template>
-            <template v-else>本周无排位</template>
+            <template v-else>本周无单双排</template>
             <span
               v-if="week.games < WEEK_SAMPLE_MIN"
               class="ml-0.5 rounded bg-amber-400/10 px-1 py-px text-[10px] text-amber-300 ring-1 ring-amber-400/25 ring-inset"

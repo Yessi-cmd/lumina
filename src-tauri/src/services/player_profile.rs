@@ -68,7 +68,9 @@ mod limits {
     pub const STANDOUT_KDA: f64 = 5.0;
 }
 
-const RANKED_QUEUES: [i64; 2] = [420, 440];
+/// Solo/duo only: win rates, streaks and form read these. Flex is often a premade
+/// stack and says less about the player, so it only counts towards champion practice.
+const RANKED_QUEUES: [i64; 1] = [420];
 const WEEK_MS: i64 = 7 * 24 * 60 * 60 * 1000;
 /// Ranked games per ranked queue read for the week's record; the same page the game
 /// panel's analysis fetches, so the two share the cache.
@@ -153,15 +155,15 @@ pub struct PlayerProfile {
     pub akari_score: Option<AkariScore>,
     /// Most recent first, across all queues.
     pub recent: Vec<GameResult>,
-    /// Most recent first, solo/duo and flex only.
+    /// Most recent first, solo/duo only.
     pub recent_ranked: Vec<GameResult>,
     pub top_champions: Vec<ChampionStat>,
     /// Position used for baselines: the current assignment, else the most played one.
     pub position: String,
     pub tags: Vec<PlayerTag>,
-    /// Solo/duo and flex record of the last 7 days; `None` until `load` fills it in.
+    /// Solo/duo record of the last 7 days; `None` until `load` fills it in.
     pub week: Option<WeekRecord>,
-    /// Input to the power index; `None` without solo/duo or flex games.
+    /// Input to the power index; `None` without solo/duo games.
     #[serde(skip)]
     pub form: Option<RankedForm>,
 }
@@ -173,7 +175,7 @@ pub struct WeekRecord {
     pub wins: usize,
 }
 
-/// Solo/duo and flex games only, recent games and games on the current position
+/// Solo/duo games only, recent games and games on the current position
 /// weighted most. Normal, ARAM and bot games say little about how someone plays ranked.
 #[derive(Debug, Clone)]
 pub struct RankedForm {
@@ -364,7 +366,7 @@ impl Facts<'_> {
     fn scope_text(&self) -> String {
         let n = self.sample.len();
         match self.scope {
-            SampleScope::Ranked => format!("最近 {n} 场排位"),
+            SampleScope::Ranked => format!("最近 {n} 场单双排"),
             SampleScope::SameQueue => format!("最近 {n} 场同模式对局"),
             SampleScope::All => format!("最近 {n} 场对局"),
         }
@@ -710,7 +712,7 @@ fn mixed_streak(run: &[&GameSummary]) -> PlayerTag {
         _ => format!("近期 {len} {word}（{casual} 娱乐）"),
     };
     let mut parts = Vec::new();
-    let kinds = [(ranked, "排位"), (casual, "娱乐模式"), (other, "其他")];
+    let kinds = [(ranked, "单双排"), (casual, "娱乐模式"), (other, "其他")];
     for (n, name) in kinds {
         if n > 0 {
             parts.push(format!("{name} {n} 场"));
@@ -730,7 +732,7 @@ fn mixed_streak(run: &[&GameSummary]) -> PlayerTag {
     tag("streak", label, tone, detail, false, priority)
 }
 
-/// A run of solo/duo and flex games, skipping other modes in between.
+/// A run of solo/duo games, skipping other modes in between.
 fn ranked_streak(run: &[&GameSummary]) -> Option<PlayerTag> {
     let len = run.len();
     if len < limits::STREAK_MIN {
@@ -739,9 +741,9 @@ fn ranked_streak(run: &[&GameSummary]) -> Option<PlayerTag> {
     let (word, outcome, tone) = streak_words(run);
     Some(tag(
         "ranked-streak",
-        format!("排位 {len} {word}"),
+        format!("单双排 {len} {word}"),
         tone,
-        format!("最近 {len} 场单双排/灵活排位全部{outcome}（不计重开，不看其他模式）。"),
+        format!("最近 {len} 场单双排全部{outcome}（不计重开，不看其他模式）。"),
         false,
         80,
     ))
@@ -751,10 +753,6 @@ fn counts(game: &GameSummary) -> bool {
     matches!(game.result, GameResult::Win | GameResult::Loss)
 }
 
-fn same_queue_family(a: i64, b: i64) -> bool {
-    a == b || (RANKED_QUEUES.contains(&a) && RANKED_QUEUES.contains(&b))
-}
-
 fn pick_sample<'a>(
     counted: &[&'a GameSummary],
     queue_id: i64,
@@ -762,7 +760,7 @@ fn pick_sample<'a>(
     if queue_id > 0 {
         let mut same = Vec::new();
         for game in counted {
-            if same_queue_family(game.queue_id, queue_id) {
+            if game.queue_id == queue_id {
                 same.push(*game);
             }
         }
@@ -914,7 +912,7 @@ pub fn add_week(form: &mut RankedForm, games: &[&GameSummary], now_ms: i64) {
     form.week_wins = week.wins;
 }
 
-/// Solo/duo and flex games and wins in the 7 days before `now_ms`.
+/// Solo/duo games and wins in the 7 days before `now_ms`.
 pub fn week_record(games: &[&GameSummary], now_ms: i64) -> WeekRecord {
     let since = now_ms - WEEK_MS;
     let mut week = WeekRecord::default();
@@ -1229,7 +1227,7 @@ mod tests {
         games.extend(many(1, 420, GameResult::Win, [5, 1, 5]));
         let profile = build(&page(games), &ProfileContext::default());
         let streak = tag_of(&profile, "ranked-streak");
-        assert_eq!(streak.label, "排位 3 连败");
+        assert_eq!(streak.label, "单双排 3 连败");
         assert_eq!(streak.tone, Tone::Negative);
         assert!(!has(&profile, "streak"));
     }
@@ -1253,7 +1251,7 @@ mod tests {
         games.extend(many(3, 420, GameResult::Win, [5, 1, 5]));
         let profile = build(&page(games), &ProfileContext::default());
         let streak = tag_of(&profile, "ranked-streak");
-        assert_eq!(streak.label, "排位 3 连胜");
+        assert_eq!(streak.label, "单双排 3 连胜");
         assert!(!has(&profile, "streak"));
     }
 
@@ -1261,14 +1259,16 @@ mod tests {
     fn prefers_current_queue_sample() {
         let mut games = many(6, 450, GameResult::Win, [9, 1, 9]);
         games.extend(many(5, 420, GameResult::Loss, [1, 5, 1]));
+        games.extend(many(4, 440, GameResult::Win, [9, 1, 9]));
         let ctx = ProfileContext {
-            queue_id: 440,
+            queue_id: 420,
             ..ProfileContext::default()
         };
         let profile = build(&page(games), &ctx);
         assert_eq!(profile.scope, SampleScope::Ranked);
         assert_eq!(profile.sample_games, 5);
         assert_eq!(profile.wins, 0);
+        assert_eq!(profile.recent_ranked.len(), 5);
     }
 
     #[test]
@@ -1320,7 +1320,8 @@ mod tests {
     fn ranked_form_skips_other_queues_and_discounts_off_role_games() {
         let mut games = many(5, 450, GameResult::Loss, [0, 10, 0]);
         games.extend(many(3, 420, GameResult::Loss, [0, 10, 0]));
-        games.extend(many(3, 440, GameResult::Win, [5, 2, 5]));
+        games.extend(many(3, 420, GameResult::Win, [5, 2, 5]));
+        games.extend(many(2, 440, GameResult::Win, [5, 2, 5]));
         for game in &mut games[5..8] {
             game.position = "UTILITY".to_owned();
         }

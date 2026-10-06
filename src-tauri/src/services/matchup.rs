@@ -1,7 +1,7 @@
 //! 田忌赛马: who is strong and who is weak in this game, and where to spend resources.
 //!
-//! Every identified player gets a power index (0–100, 50 = average) from solo/duo and flex
-//! games only, recent games and games on the current position weighted most: win rate
+//! Every identified player gets a power index (0–100, 50 = average) from solo/duo games
+//! only, recent games and games on the current position weighted most: win rate
 //! shrunk towards 50% for small samples, performance against the average player on the
 //! same position, gold against the lane opponent at 10 minutes, and whether they play
 //! their usual position (补位 costs power). Players are then ranked within their own team
@@ -20,7 +20,7 @@ use crate::state::ongoing::{Roster, RosterPlayer, RosterStage};
 
 /// Every threshold in one place.
 mod limits {
-    /// Fewer solo/duo and flex games and the player gets no power index.
+    /// Fewer solo/duo games and the player gets no power index.
     pub const POWER_MIN_GAMES: usize = 5;
     /// Pseudo-games at 50% mixed into the win rate, so 3-0 is not treated as 100%.
     pub const WIN_RATE_PRIOR_GAMES: f64 = 4.0;
@@ -420,7 +420,7 @@ fn breakdown(profile: &PlayerProfile, early: Option<&EarlyStats>, power: f64) ->
     let rate = (form.wins / form.weight * 100.0).round();
     let n = form.games;
     let head = format!("战力 {power:.0} = 50 + 胜率 {win:+.0}");
-    let mut text = format!("{head}（单双排/灵活 {n} 场，近期加权 {rate}%）");
+    let mut text = format!("{head}（单双排 {n} 场，近期加权 {rate}%）");
     if form.performance.is_some() {
         text.push_str(&format!(" + 表现 {performance:+.0}"));
     }
@@ -488,7 +488,14 @@ fn gank_and_lane_tags(seat: &Seat) -> Vec<PlayerTag> {
 /// A few standout games lately, or recent ranked games mostly won and well above the
 /// average player on the same position.
 fn is_carry(form: &RankedForm) -> bool {
-    has_standouts(form) || is_consistent(form)
+    !support_main(form) && (has_standouts(form) || is_consistent(form))
+}
+
+/// Supports rarely carry a game on their own, and their damage and gold shares look
+/// outstanding against the support baseline, so a support main is never 小代.
+fn support_main(form: &RankedForm) -> bool {
+    let main = form.position_games.first();
+    main.is_some_and(|(position, _)| position == "UTILITY")
 }
 
 /// The win rate the 小代 rules read, from the last week when it has enough ranked games.
@@ -545,7 +552,7 @@ fn carry_tag(seat: &Seat) -> Option<PlayerTag> {
         format!("近 {n} 场")
     };
     let rate = rate * 100.0;
-    let mut detail = format!("{scope}排位 {w} 胜 {} 负（胜率 {rate:.0}%）", n - w);
+    let mut detail = format!("{scope}单双排 {w} 胜 {} 负（胜率 {rate:.0}%）", n - w);
     if is_consistent(form) {
         detail.push_str("，表现远超同位置平均水平");
     }
@@ -834,6 +841,18 @@ mod tests {
         profiles.insert("a-TOP".to_owned(), p);
         let m = analyze(&roster, &profiles, &HashMap::new());
         assert!(!labels(&m, "a-TOP").contains(&"小代".to_owned()));
+    }
+
+    #[test]
+    fn support_mains_are_never_carries() {
+        let (roster, mut profiles) = game();
+        let mut p = carry("UTILITY");
+        if let Some(form) = p.form.as_mut() {
+            form.position_games = vec![("UTILITY".to_owned(), 18), ("JUNGLE".to_owned(), 2)];
+        }
+        profiles.insert("a-UTILITY".to_owned(), p);
+        let m = analyze(&roster, &profiles, &HashMap::new());
+        assert!(!labels(&m, "a-UTILITY").contains(&"小代".to_owned()));
     }
 
     #[test]
