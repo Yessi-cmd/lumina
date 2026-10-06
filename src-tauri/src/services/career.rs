@@ -146,14 +146,16 @@ struct LcuRankedQueue {
     previous_season_end_division: String,
 }
 
+/// `champion` narrows the analysis to games on that champion.
 pub async fn load(
     history: &MatchHistoryService,
     session: &LcuSession,
     puuid: &str,
     queue: Option<i64>,
     range: Range,
+    champion: Option<i64>,
 ) -> Result<Career> {
-    let fetched = games(history, session, puuid, queue, range);
+    let fetched = games(history, session, puuid, queue, range, champion);
     let (fetched, ranked, mastery) = tokio::join!(
         fetched,
         ranked(session, puuid),
@@ -169,30 +171,38 @@ pub async fn load(
 }
 
 /// Newest first; the flag says whether the history goes on beyond what was read.
+/// With `champion`, only games on it count, and "recent" means its last 20 games.
 pub(super) async fn games(
     history: &MatchHistoryService,
     session: &LcuSession,
     puuid: &str,
     queue: Option<i64>,
     range: Range,
+    champion: Option<i64>,
 ) -> Result<(Vec<GameSummary>, bool)> {
-    if range == Range::Recent {
+    if range == Range::Recent && champion.is_none() {
         let request = history.get_queue(session, puuid, 0, RECENT_GAMES, queue);
         return Ok((request.await?.games, false));
     }
-    let since = match range {
-        Range::Season => year_start_ms(now_ms()),
-        _ => 0,
+    let (since, limit) = match range {
+        Range::Recent => (0, RECENT_GAMES as usize),
+        Range::Season => (year_start_ms(now_ms()), MAX_GAMES),
+        Range::Career => (0, MAX_GAMES),
     };
+    let on_champion = |g: &GameSummary| champion.is_none_or(|c| g.champion_id == c);
     let mut games = Vec::new();
     for page in 0..MAX_PAGES {
         let request = history.get_queue(session, puuid, page * PAGE, PAGE, queue);
         let found = request.await?.games;
         let done = found.is_empty() || found.iter().any(|g| g.created_at < since);
-        games.extend(found.into_iter().filter(|g| g.created_at >= since));
-        if done || games.len() >= MAX_GAMES {
+        for game in found {
+            if game.created_at >= since && on_champion(&game) {
+                games.push(game);
+            }
+        }
+        if done || games.len() >= limit {
             let truncated = !done;
-            games.truncate(MAX_GAMES);
+            games.truncate(limit);
             return Ok((games, truncated));
         }
     }

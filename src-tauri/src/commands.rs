@@ -159,17 +159,19 @@ pub fn draft_state() -> Option<Draft> {
     services::draft::latest()
 }
 
-/// Career analysis of one player; `queue` narrows it to one mode.
+/// Career analysis of one player; `queue` narrows it to one mode, `champion` to one
+/// champion.
 #[tauri::command]
 pub async fn career(
     state: State<'_, AppState>,
     puuid: String,
     queue: Option<i64>,
     range: Range,
+    champion: Option<i64>,
 ) -> Result<Career> {
     let session = state.session()?;
     let history = &state.match_history;
-    services::career::load(history, &session, &puuid, queue, range).await
+    services::career::load(history, &session, &puuid, queue, range, champion).await
 }
 
 /// The teammates a player queues with most, and the record with and without them.

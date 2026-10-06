@@ -683,8 +683,9 @@ export const api = {
   autoAcceptState: () => invoke<PendingAccept | null>("auto_accept_state"),
   cancelAutoAccept: () => invoke<void>("cancel_auto_accept"),
   draftState: () => invoke<Draft | null>("draft_state"),
-  career: (puuid: string, queue: number | null, range: CareerRange) =>
-    invoke<Career>("career", { puuid, queue, range }),
+  /** `champion` narrows the analysis to games on that champion. */
+  career: (puuid: string, queue: number | null, range: CareerRange, champion: number | null = null) =>
+    invoke<Career>("career", { puuid, queue, range, champion }),
   /** Without `puuid`, the account seen last. */
   rankHistory: (puuid: string | null = null) => invoke<RankHistory | null>("rank_history", { puuid }),
   teammates: (puuid: string, queue: number | null, range: CareerRange) =>

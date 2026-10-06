@@ -64,7 +64,7 @@ pub async fn load(
     queue: Option<i64>,
     range: Range,
 ) -> Result<Teammates> {
-    let (games, _) = career::games(history, session, puuid, queue, range).await?;
+    let (games, _) = career::games(history, session, puuid, queue, range, None).await?;
     let mut found = analyze(&games, puuid);
     let lookups = found
         .regulars

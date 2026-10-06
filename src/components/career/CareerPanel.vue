@@ -3,6 +3,7 @@ import { computed, ref, shallowRef, watch } from "vue";
 import { api, type Career, type CareerRange, type Rates } from "../../api";
 import { useGameDataStore } from "../../stores/gameData";
 import { TIERS, tierText } from "../../utils/rank";
+import ChampionPicker from "../champion/ChampionPicker.vue";
 import RadarChart from "./RadarChart.vue";
 import TeammatesCard from "./TeammatesCard.vue";
 import TrendChart from "./TrendChart.vue";
@@ -33,19 +34,29 @@ const POSITIONS: Record<string, string> = {
 
 const range = ref<CareerRange>("recent");
 const mode = ref<number | null>(null);
+/** One champion's games only; null for all. */
+const champion = ref<number | null>(null);
+const picking = ref(false);
+
+/** Champion stats are about ranked form, so picking one from 综合 switches to 单双排. */
+function chooseChampion(id: number) {
+  champion.value = id;
+  picking.value = false;
+  if (mode.value === null) mode.value = 420;
+}
 const career = shallowRef<Career | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
 let generation = 0;
 
 watch(
-  () => [props.puuid, range.value, mode.value] as const,
-  async ([puuid, r, m]) => {
+  () => [props.puuid, range.value, mode.value, champion.value] as const,
+  async ([puuid, r, m, ch]) => {
     const gen = ++generation;
     loading.value = true;
     error.value = null;
     try {
-      const result = await api.career(puuid, m, r);
+      const result = await api.career(puuid, m, r, ch);
       if (gen === generation) career.value = result;
     } catch (err) {
       if (gen === generation) error.value = String(err);
@@ -142,11 +153,40 @@ const maxPositionGames = computed(() => Math.max(1, ...(c.value?.positions.map((
           {{ m.label }}
         </button>
       </div>
+      <div class="flex items-center gap-1.5">
+        <button
+          v-if="champion === null"
+          class="btn btn-secondary py-1 text-sm"
+          v-tip="'只看某个英雄的胜率和表现'"
+          @click="picking = !picking"
+        >
+          全部英雄
+        </button>
+        <span
+          v-else
+          class="flex items-center gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 py-0.5 pr-1 pl-0.5 text-sm text-amber-200"
+        >
+          <img :src="gd.championIcon(champion)" class="size-6 rounded-md bg-zinc-800" />
+          {{ gd.championName(champion) }}
+          <button class="btn btn-secondary px-1.5 py-0 text-xs" @click="picking = !picking">换</button>
+          <button class="btn btn-secondary px-1.5 py-0 text-xs" v-tip="'看全部英雄'" @click="champion = null">✕</button>
+        </span>
+      </div>
       <span v-if="loading" class="flex items-center gap-2 text-xs text-zinc-500">
         <span class="size-3 animate-spin rounded-full border-2 border-zinc-600 border-t-amber-400" />
-        {{ range === "recent" ? "读取中…" : "正在翻阅战绩，最多 400 场，可能需要几秒…" }}
+        {{
+          range === "recent" && champion === null
+            ? "读取中…"
+            : champion !== null && range === "recent"
+              ? "正在翻阅战绩，找这个英雄最近 20 场…"
+              : "正在翻阅战绩，最多 400 场，可能需要几秒…"
+        }}
       </span>
     </div>
+    <ChampionPicker v-if="picking" @pick="chooseChampion" @close="picking = false" />
+    <p v-if="champion !== null" class="-mt-2 text-xs text-zinc-500">
+      只统计{{ gd.championName(champion) }}的对局：近期 = 最近 20 场该英雄，本赛季 / 生涯最多翻阅 600 场战绩。雷达图是该英雄与对位的表现对比。
+    </p>
 
     <p v-if="error" class="text-sm break-all text-red-400">{{ error }}</p>
 
@@ -155,7 +195,7 @@ const maxPositionGames = computed(() => Math.max(1, ...(c.value?.positions.map((
     </div>
 
     <Transition name="fade" mode="out-in">
-      <div v-if="c" :key="`${range}-${mode}`" class="flex flex-col gap-4" :class="loading && 'opacity-60'">
+      <div v-if="c" :key="`${range}-${mode}-${champion}`" class="flex flex-col gap-4" :class="loading && 'opacity-60'">
         <p v-if="c.games === 0" class="empty-state">这个范围里没有对局。</p>
         <template v-else>
           <!-- Headline numbers -->
@@ -309,7 +349,9 @@ const maxPositionGames = computed(() => Math.max(1, ...(c.value?.positions.map((
                   <tr
                     v-for="ch in c.champions"
                     :key="ch.championId"
-                    class="border-t border-white/[0.04] transition-colors hover:bg-white/[0.025]"
+                    class="cursor-pointer border-t border-white/[0.04] transition-colors hover:bg-white/[0.025]"
+                    v-tip="champion === null ? '点击只看这个英雄' : undefined"
+                    @click="chooseChampion(ch.championId)"
                   >
                     <td class="py-1.5">
                       <div class="flex items-center gap-2">
